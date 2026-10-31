@@ -64,6 +64,15 @@ h3{font-size:1rem;font-weight:700;margin:24px 0 10px}
 .lg-bg{fill:var(--brand)} .lg-fg{stroke:var(--brand-ink);fill:none}
 .appbar .sp{flex:1}
 .iconbtn{width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;transition:background .15s,border-color .15s}
+.iconbtn[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
+.menuwrap{position:relative}
+.avatar{width:44px;height:44px;border-radius:50%;border:0;background:var(--brand);color:var(--brand-ink);font-weight:800;font-size:.95rem;letter-spacing:.02em;cursor:pointer;transition:filter .15s}
+.avatar:hover{filter:brightness(1.1)}
+.menu{position:absolute;right:0;top:calc(100% + 8px);min-width:260px;background:var(--surface);border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--shadow-lg);padding:8px;z-index:50}
+.menu .mh{padding:8px 12px 10px;margin-bottom:6px;border-bottom:1px solid var(--line);font-size:.95rem}
+.menu button{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:0 12px;border:0;background:none;border-radius:12px;font-weight:600;font-size:.95rem;text-align:left;cursor:pointer;color:var(--ink)}
+.menu button:hover{background:var(--surface-2)}
+.menu button[aria-current="page"]{background:var(--brand-soft);color:var(--brand)}
 .iconbtn:hover{background:var(--surface-2);border-color:var(--line-strong)}
 
 /* ---------- barra di navigazione in basso ---------- */
@@ -1003,7 +1012,10 @@ function viewPiano(){
   <li>Aspetta 24 ore prima di un acquisto non necessario.</li>
   <li>Controlla gli abbonamenti ogni 3 mesi.</li>
   <li>Le piccole spese ripetute pesano più di quelle grandi e rare.</li></ul></div>
-  ${setupCard('Entrate e obiettivo')}
+`;
+}
+function viewImpostazioni(){
+  return `${setupCard('Entrate e obiettivo')}
 
   <h3>Backup</h3><div class="card"><p class="note" style="margin-top:0">Copia questo testo e incollalo in un posto sicuro, ad esempio nelle Note. Per ripristinare i dati, incolla qui il testo salvato e premi Ripristina.</p>
   <textarea id="bk" class="ta" rows="4">${esc(JSON.stringify(state))}</textarea>
@@ -1012,13 +1024,20 @@ function viewPiano(){
   <h3>I tuoi dati</h3><div class="card"><p class="note" style="margin-top:0">I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: esportali ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expEvents">Dati d’uso</button><button class="btn" data-act="expAll">Tutti i dati</button></div></div>`;
 }
 
+let menuOpen=false;
+function drawTop(){
+  const ini=((user.nome||'')[0]||'')+((user.cognome||'')[0]||'');
+  const items=[['piano','Piano di 30 giorni','<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 4.8M3.5 12l1.2 1.2L7 10.8M3.5 18l1.2 1.2L7 16.8"/></svg>'],['impostazioni','Impostazioni',IC.gear]];
+  document.getElementById('top').innerHTML=`<div class="in"><div class="brand">${IC.logo}<span>Meno spese</span></div><span class="sp"></span><div class="menuwrap"><button class="avatar" data-act="menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Menu: piano e impostazioni">${esc(ini.toUpperCase())}</button>${menuOpen?`<div class="menu" role="menu"><div class="mh"><strong>${esc(user.nome+' '+user.cognome)}</strong></div>${items.map(([k,l,ic])=>`<button role="menuitem" data-tab="${k}" ${tab===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('')}</div>`:''}</div></div>`;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menuOpen){menuOpen=false;drawTop();}});
 function render(){
   const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Anno'],['auto','Mensili'],['conti','Conti']];
-  const v=tab==='oggi'?viewOggi():tab==='spese'?viewSpese():tab==='anno'?viewAnno():tab==='auto'?viewMensili():tab==='conti'?viewConti():viewPiano();
-  const pn=tab==='piano';
-  document.getElementById('top').innerHTML=`<div class="in"><div class="brand">${IC.logo}<span>Meno spese</span></div><span class="sp"></span><button class="iconbtn" data-tab="${pn?'oggi':'piano'}" aria-label="${pn?'Chiudi impostazioni':'Piano e impostazioni'}">${pn?IC.close:IC.gear}</button></div>`;
+  const v=tab==='oggi'?viewOggi():tab==='spese'?viewSpese():tab==='anno'?viewAnno():tab==='auto'?viewMensili():tab==='conti'?viewConti():tab==='piano'?viewPiano():viewImpostazioni();
+  const pn=tab==='piano'||tab==='impostazioni';
+  drawTop();
   document.getElementById('tabbar').innerHTML=`<div class="in">${tabs.map(([k,n])=>`<button data-tab="${k}" ${tab===k?'aria-current="page"':''}><span class="ti">${IC[k==="auto"?"mensili":k]}</span><span>${n}</span></button>`).join('')}</div>`;
-  app.innerHTML=(pn?'<h1 class="page">Piano e impostazioni</h1>':'')+v+`<p class="note" id="saveStatus" role="status"></p>`;
+  app.innerHTML=(pn?`<h1 class="page">${tab==='piano'?'Piano di 30 giorni':'Impostazioni'}</h1>`:'')+v+`<p class="note" id="saveStatus" role="status"></p>`;
   showStatus();
   updQuota();
 }
@@ -1030,10 +1049,12 @@ function shiftM(d){
   vy=y;vm=m;sel=null;editId=null;
 }
 document.addEventListener('click',e=>{
+  if(menuOpen&&!e.target.closest('.menuwrap')){menuOpen=false;drawTop();}
   const t=e.target.closest('[data-tab],[data-act]');if(!t)return;
   msg='';
-  if(t.dataset.tab){tab=t.dataset.tab;catFilter=null;track('tab_view',tab);render();window.scrollTo(0,0);return;}
+  if(t.dataset.tab){menuOpen=false;tab=t.dataset.tab;catFilter=null;track('tab_view',tab);render();window.scrollTo(0,0);return;}
   const a=t.dataset.act;
+  if(a==='menu'){menuOpen=!menuOpen;drawTop();return;}
   if(a==='saveSetup'){
     const inc=num(document.getElementById('inc').value),goal=num(document.getElementById('goal').value)||0;
     if(!(inc>0))msg='Inserisci le entrate mensili.';
