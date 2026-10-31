@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metriche d’uso – Meno spese</title>
+<style>
+:root{color-scheme:light dark;--bg:#EDF1EE;--surface:#FFFFFF;--ink:#12302B;--muted:#56706A;--line:#D3DDD8;--ok:#1E7F5C;--okbg:#CDE8DC;--warn:#B07A00;--warnbg:#F6E3B0;--bad:#C23B2E;--badbg:#F4CDC8;--accent:#1B4FD6}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1A18;--surface:#172421;--ink:#E6EFEC;--muted:#93A8A2;--line:#28403A;--ok:#4CC38F;--okbg:#1B4A39;--warn:#F0B63A;--warnbg:#4F3E10;--bad:#F07268;--badbg:#5A2723;--accent:#7FA2FF}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Avenir Next","Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 64px}
+h1{font-size:1.4rem;margin:0}h2{font-size:1.05rem;margin:0 0 12px}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.note{color:var(--muted);font-size:.9rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi b{display:block;font-size:1.8rem;line-height:1.1;font-variant-numeric:tabular-nums}.kpi span{color:var(--muted);font-size:.85rem}
+.chart{display:flex;align-items:flex-end;gap:6px;height:130px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.chart .c{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.chart .b{width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.chart .v{font-size:.72rem;color:var(--muted)}.chart .d{position:absolute;bottom:-20px;font-size:.7rem;color:var(--muted)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;white-space:nowrap}
+th,td{padding:10px 8px;text-align:left;border-top:1px solid var(--line)}th{font-size:.8rem;color:var(--muted);border-top:0}
+td.n,th.n{text-align:right}tr.u{cursor:pointer}tr.u:hover{background:var(--bg)}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.78rem;font-weight:700}
+.badge.oggi{background:var(--okbg);color:var(--ok)}.badge.recente{background:var(--warnbg);color:var(--warn)}.badge.inattivo{background:var(--badbg);color:var(--bad)}
+.spark{display:inline-flex;align-items:flex-end;gap:2px;height:22px}.spark i{width:5px;background:var(--accent);border-radius:1px;display:block}.spark i.z{background:var(--line)}
+.det{white-space:normal;background:var(--bg)}.det .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:6px 0}
+.det h3{font-size:.85rem;margin:0 0 6px;color:var(--muted)}.det ul{margin:0;padding-left:18px;font-size:.9rem}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1>Metriche d’uso – Meno spese</h1><span class="note" id="upd"></span></div>
+  <div class="card"><h2>Carica i dati d’uso</h2><p class="note" style="margin-top:0">Ogni utente esporta dalla scheda Piano il file “Dati d’uso” e te lo invia. Caricali qui, anche più file insieme; puoi aggiungerne altri in seguito (i doppioni vengono ignorati). I dati restano solo in questo browser.</p><input type="file" id="fl" accept=".csv,text/csv" multiple><p class="note" id="fmsg" style="margin:8px 0 0"></p><button class="link" id="clr" style="padding:0">Svuota archivio</button></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h2>Utenti attivi negli ultimi 14 giorni</h2><div class="chart" id="chart"></div></div>
+  <div class="card"><h2>Utenti</h2><div class="wrap" id="tbl"></div><p class="note" style="margin:10px 0 0">Tocca un utente per vedere il dettaglio. Il tempo attivo conta solo i minuti con l’app aperta e usata. Operazioni = aggiunte, modifiche ed eliminazioni di dati.</p></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ENT={expense:'Spese',vehicle:'Veicoli',route:'Tragitti',fixed_cost:'Spese fisse',ledger_move:'Movimenti carta/contanti',paypal_move:'Movimenti PayPal',setting:'Impostazioni',plan_item:'Piano 30 giorni'};
+const ACT={add:'aggiunte',update:'modificate',delete:'eliminate'};
+const APPEV={app_open:'Ha aperto l’app',tab_view:'Ha aperto la scheda',user_switch:'Ha cambiato utente'};
+const evName=e=>{if(APPEV[e])return APPEV[e];const i=e.lastIndexOf('_');return (ENT[e.slice(0,i)]||e.slice(0,i))+' '+(ACT[e.slice(i+1)]||e.slice(i+1));};
+const fm=m=>m<60?m+' min':Math.floor(m/60)+' h '+String(m%60).padStart(2,'0')+' min';
+let D=null;const open=new Set();
+const tf=(ts,o)=>new Date(ts).toLocaleString('it-IT',Object.assign({timeZone:D.tz},o));
+function last(u){return u.days_ago===0?'oggi '+tf(u.last_seen,{hour:'2-digit',minute:'2-digit'}):u.days_ago===1?'ieri':u.days_ago+' giorni fa';}
+function render(){
+  const t=D.totals;
+  $('upd').textContent='Calcolato alle '+tf(D.generated_at,{hour:'2-digit',minute:'2-digit'})+'';
+  $('kpis').innerHTML=[[t.users,'Utenti registrati'],[t.active_today,'Attivi oggi'],[t.active_7d,'Attivi negli ultimi 7 giorni'],[t.sessions,'Sessioni totali'],[t.ops,'Operazioni sui dati'],[fm(t.active_min),'Tempo attivo totale']].map(([v,l])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+  const mx=Math.max(1,...D.daily_total.map(d=>d.active_users));
+  $('chart').innerHTML=D.daily_total.map(d=>`<div class="c" title="${d.day}: ${d.active_users} utenti, ${d.ops} operazioni"><span class="v">${d.active_users||''}</span><div class="b" style="height:${Math.round(d.active_users/mx*85)}%;${d.active_users?'':'opacity:.25'}"></div><span class="d">${d.day.slice(8)}/${d.day.slice(5,7)}</span></div>`).join('');
+  if(!D.users.length){$('tbl').innerHTML='<p class="note">Carica almeno un file di dati d’uso.</p>';return;}
+  const rows=D.users.map(u=>{
+    const m=Math.max(1,...u.daily);
+    const sp=`<span class="spark">${u.daily.map((v,i)=>`<i class="${v?'':'z'}" style="height:${v?Math.max(4,Math.round(v/m*22)):3}px" title="${D.days[i]}: ${v}"></i>`).join('')}</span>`;
+    const by=Object.entries(u.ops_by_type).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<li>${esc(evName(k))}: ${v}</li>`).join('')||'<li>nessuna</li>';
+    const tabs=Object.entries(u.tabs).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<li>${esc(k)}: ${v}</li>`).join('')||'<li>nessuna</li>';
+    const rec=u.recent.map(r=>`<li>${tf(r[0],{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} – ${esc(evName(r[1]))}${r[2]?' ('+esc(r[2])+')':''}</li>`).join('');
+    return `<tr class="u" data-u="${esc(u.user_id)}"><td><strong>${esc(u.name)}</strong></td><td><span class="badge ${u.status}">${u.status==='oggi'?'Attivo oggi':u.status==='recente'?'Attivo 7 gg':'Inattivo'}</span></td><td>${last(u)}</td><td>${tf(u.first_seen,{day:'2-digit',month:'2-digit',year:'2-digit'})}</td><td class="n">${u.sessions}</td><td class="n">${u.active_days}</td><td class="n">${fm(u.active_min)}</td><td class="n">${u.ops}</td><td class="n">${u.expenses}</td><td>${sp}</td></tr>`+
+    (open.has(u.user_id)?`<tr><td class="det" colspan="10"><div class="g"><div><h3>Operazioni per tipo</h3><ul>${by}</ul></div><div><h3>Schede aperte</h3><ul>${tabs}</ul></div><div><h3>Ultime azioni</h3><ul>${rec}</ul></div></div></td></tr>`:'');
+  }).join('');
+  $('tbl').innerHTML=`<table><thead><tr><th>Utente</th><th>Stato</th><th>Ultimo accesso</th><th>Primo accesso</th><th class="n">Sessioni</th><th class="n">Giorni attivi</th><th class="n">Tempo attivo</th><th class="n">Operazioni</th><th class="n">Spese attive</th><th>Ultimi 14 gg</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+$('tbl').addEventListener('click',e=>{const r=e.target.closest('tr.u');if(!r)return;const id=r.dataset.u;open.has(id)?open.delete(id):open.add(id);render();});
+// Incolla qui l’indirizzo (…/exec) dell’app web Google Apps Script. Se vuoto, usa i file CSV caricati a mano.
+const SHEET_URL='https://script.google.com/macros/s/AKfycbxjeEIWqRjCKBrjKi7juW86XEeGp-QXy_MVT6t-Skpxabk-qOlxNbQHo49qHlL0VdIxwQ/exec';
+/* ---------- calcolo delle metriche dai file CSV caricati (tutto nel browser) ---------- */
+const EC=['ts','user_id','user_name','session_id','event','entity','entity_id','detail','device'],TZ='Europe/Rome';
+function parseCSV(t){
+  const rs=[];let r=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;else if(c===','){r.push(f);f='';}
+    else if(c==='\n'){r.push(f);rs.push(r);r=[];f='';}else if(c!=='\r')f+=c;}
+  if(f!==''||r.length){r.push(f);rs.push(r);}
+  if(!rs.length)return[];const h=rs[0];
+  return rs.slice(1).filter(r=>r.length>1).map(r=>{const o={};EC.forEach(c=>{const j=h.indexOf(c);o[c]=(j<0?'':r[j]||'').replace(/^'(?=[=+\-@\t\r])/,'');});return o;});
+}
+let EVS=[];
+const kvOpen=()=>new Promise((res,rej)=>{const r=indexedDB.open('meno-spese-metrics',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+async function kv(op,v){const db=await kvOpen();return new Promise((res,rej)=>{const tx=db.transaction('k',op==='get'?'readonly':'readwrite'),s=tx.objectStore('k'),q=op==='get'?s.get('ev'):s.put(v,'ev');tx.oncomplete=()=>res(q.result);tx.onerror=()=>rej(tx.error);});}
+const fmtD=new Intl.DateTimeFormat('sv-SE',{timeZone:TZ}),dayOf=ts=>fmtD.format(new Date(ts));
+function compute(){
+  const today=dayOf(Date.now()),utc=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8)),t0=utc(today);
+  const days=[...Array(14)].map((_,i)=>new Date(t0-(13-i)*864e5).toISOString().slice(0,10));
+  const ago=d=>Math.round((t0-utc(d))/864e5);
+  const P=new Map(),DT=days.map(()=>({u:new Set(),ops:0}));
+  for(const e of EVS){
+    let p=P.get(e.user_id);
+    if(!p){p={user_id:e.user_id,name:e.user_name,first_seen:e.ts,last_seen:e.ts,sessions:new Set(),days:new Set(),sec:0,ops:0,by:{},tabs:{},daily:Array(14).fill(0),recent:[],ex:0};P.set(e.user_id,p);}
+    const d=dayOf(e.ts),i=days.indexOf(d);
+    if(e.ts>p.last_seen)p.last_seen=e.ts;if(e.ts<p.first_seen)p.first_seen=e.ts;
+    p.days.add(d);if(i>=0)DT[i].u.add(e.user_id);
+    if(e.event==='app_open')p.sessions.add(e.session_id);
+    if(e.event==='heartbeat'){p.sec+=+e.detail||0;continue;}
+    if(i>=0)p.daily[i]++;
+    if(e.event==='tab_view')p.tabs[e.detail]=(p.tabs[e.detail]||0)+1;
+    if(e.entity){p.ops++;p.by[e.event]=(p.by[e.event]||0)+1;if(i>=0)DT[i].ops++;if(e.event==='expense_add')p.ex++;if(e.event==='expense_delete')p.ex--;}
+    p.recent.push([e.ts,e.event,e.detail]);if(p.recent.length>12)p.recent.shift();
+  }
+  const out=[...P.values()].map(p=>{const a=ago(dayOf(p.last_seen));return{user_id:p.user_id,name:p.name,first_seen:p.first_seen,last_seen:p.last_seen,days_ago:a,status:a===0?'oggi':a<=7?'recente':'inattivo',sessions:p.sessions.size,active_days:p.days.size,active_min:Math.round(p.sec/60),ops:p.ops,ops_by_type:p.by,tabs:p.tabs,expenses:Math.max(0,p.ex),daily:p.daily,recent:p.recent.reverse()};}).sort((a,b)=>b.last_seen.localeCompare(a.last_seen));
+  const sum=k=>out.reduce((a,u)=>a+u[k],0);
+  D={generated_at:new Date().toISOString(),tz:TZ,days,daily_total:days.map((d,i)=>({day:d,active_users:DT[i].u.size,ops:DT[i].ops})),totals:{users:out.length,active_today:out.filter(u=>u.days_ago===0).length,active_7d:out.filter(u=>u.days_ago<=7).length,sessions:sum('sessions'),ops:sum('ops'),active_min:sum('active_min')},users:out};
+  render();
+}
+$('fl').addEventListener('change',async e=>{
+  const seen=new Set(EVS.map(x=>EC.map(c=>x[c]).join('|'))),before=EVS.length;
+  for(const f of e.target.files){for(const r of parseCSV(await f.text())){const k=EC.map(c=>r[c]).join('|');if(r.ts&&r.user_id&&!seen.has(k)){seen.add(k);EVS.push(r);}}}
+  EVS.sort((a,b)=>a.ts.localeCompare(b.ts));
+  try{await kv('set',EVS);}catch(x){}
+  $('fmsg').textContent=(EVS.length-before)+' nuovi eventi caricati ('+EVS.length+' in totale).';
+  e.target.value='';compute();
+});
+$('clr').addEventListener('click',async()=>{if(!confirm('Cancellare tutti i dati caricati in questa pagina?'))return;EVS=[];try{await kv('set',[]);}catch(x){}$('fmsg').textContent='Archivio svuotato.';compute();});
+async function pull(){
+  try{
+    const rows=await (await fetch(SHEET_URL)).json(),seen=new Set(),out=[];
+    for(const r of rows){const k=EC.map(c=>r[c]).join('|');if(r.ts&&r.user_id&&!seen.has(k)){seen.add(k);out.push(r);}}
+    out.sort((a,b)=>a.ts.localeCompare(b.ts));EVS=out;
+    $('fmsg').textContent=EVS.length+' eventi letti dal foglio Google.';compute();
+  }catch(e){$('fmsg').textContent='Impossibile leggere il foglio Google: controlla l’indirizzo e i permessi dell’app web.';}
+}
+if(SHEET_URL){
+  const c=$('fl').closest('.card');
+  c.querySelector('h2').textContent='Origine dati';
+  c.querySelector('p').textContent='I dati arrivano dal foglio Google e si aggiornano ogni minuto.';
+  $('fl').style.display=$('clr').style.display='none';
+}
+(async()=>{
+  if(SHEET_URL){compute();await pull();setInterval(pull,60000);return;}
+  try{EVS=(await kv('get'))||[];}catch(e){}
+  compute();
+})();
+</script>
+</body>
+</html>
