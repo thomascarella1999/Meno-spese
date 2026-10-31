@@ -217,6 +217,23 @@ ul.rules li{margin-bottom:8px}
 .dlogo svg{width:52px;height:52px;display:block;margin-bottom:14px}
 .dlg h2{font-size:1.4rem;font-weight:800;letter-spacing:-.025em}
 
+/* ---------- invito a installare ---------- */
+#install{max-width:600px;margin:0 auto;padding:0 16px}
+.inst{display:flex;align-items:center;gap:12px;margin:4px 0 8px;padding:12px 8px 12px 14px;background:var(--brand-soft);border:1px solid color-mix(in srgb,var(--brand) 35%,transparent);border-radius:18px}
+.inst .ilogo svg{width:40px;height:40px;display:block}
+.inst .itxt{flex:1;min-width:0;font-size:.85rem;color:var(--muted);line-height:1.35}
+.inst .itxt strong{display:block;color:var(--ink);font-size:.95rem}
+.inst .ibtn{flex:none;min-height:44px;padding:0 16px;border:0;border-radius:12px;background:var(--brand);color:var(--brand-ink);font-weight:700;cursor:pointer}
+.inst .ibtn:hover{filter:brightness(1.08)}
+.inst .ix{flex:none;width:40px;height:44px;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;border-radius:10px}
+.inst .ix:hover{background:var(--surface-2)}
+.sheet{align-items:flex-end}
+.sheet .dlg{border-radius:24px 24px 20px 20px;margin-bottom:max(0px,env(safe-area-inset-bottom,0px))}
+.steps{list-style:none;counter-reset:s;margin:0 0 16px;padding:0}
+.steps li{counter-increment:s;display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0}
+.steps li::before{content:counter(s);flex:none;width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font-weight:800;font-size:.85rem;display:grid;place-items:center}
+.steps .i{display:inline-block;width:18px;height:18px;vertical-align:-4px;color:var(--brand)}
 @media (min-width:720px){
   main{padding-top:16px}
   .hero{padding:28px 28px 22px}
@@ -228,6 +245,7 @@ ul.rules li{margin-bottom:8px}
 </head>
 <body>
 <header class="appbar" id="top"></header>
+<div id="install"></div>
 <main id="app"></main>
 <nav class="tabbar" id="tabbar" aria-label="Sezioni principali"></nav>
 <script>
@@ -1192,6 +1210,70 @@ app.addEventListener('change',e=>{
   state.plan[id]=e.target.checked;save();render();
 });
 
+/* ---------- installazione sulla Home (Android: automatica; iPhone: guidata) ---------- */
+let dip=null;
+const INSK='meno-spese-install-nascondi';
+const isStandalone=()=>(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isAndroid=()=>/Android/i.test(navigator.userAgent);
+function iconPng(sz){
+  const c=document.createElement('canvas');c.width=c.height=sz;const x=c.getContext('2d'),k=sz/32;
+  x.fillStyle='#0F6B57';x.fillRect(0,0,sz,sz);
+  x.strokeStyle='#fff';x.lineWidth=2.6*k*0.8;x.lineCap='round';x.lineJoin='round';
+  x.translate(sz*0.1,sz*0.1);x.scale(0.8*k,0.8*k);x.lineWidth=2.8;
+  x.beginPath();x.moveTo(9,11);x.lineTo(14,16);x.lineTo(17,13);x.lineTo(23,19);x.stroke();
+  x.beginPath();x.moveTo(23,14);x.lineTo(23,19);x.lineTo(18,19);x.stroke();
+  return c.toDataURL('image/png');
+}
+function setupManifest(){
+  try{
+    if(location.protocol==='file:')return;
+    const base=location.href.split('#')[0].split('?')[0];
+    const m={name:'Meno spese',short_name:'Meno spese',description:'Tieni sotto controllo le spese ogni giorno',lang:'it',start_url:base,scope:base.replace(/[^/]*$/,''),id:base,display:'standalone',orientation:'portrait',background_color:'#F1F5F3',theme_color:'#0F6B57',icons:[{src:iconPng(192),sizes:'192x192',type:'image/png',purpose:'any'},{src:iconPng(512),sizes:'512x512',type:'image/png',purpose:'any'}]};
+    const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));document.head.appendChild(l);
+    const a=document.createElement('link');a.rel='apple-touch-icon';a.href=iconPng(180);document.head.appendChild(a);
+  }catch(e){}
+}
+function installHidden(){try{const t=parseInt(localStorage.getItem(INSK),10);return t&&Date.now()-t<14*864e5;}catch(e){return false;}}
+function renderInstall(){
+  const el=document.getElementById('install');if(!el)return;
+  const can=!isStandalone()&&!installHidden()&&(dip||isIOS()||isAndroid());
+  el.innerHTML=can?`<div class="inst" role="region" aria-label="Installa l’app"><span class="ilogo">${IC.logo}</span><div class="itxt"><strong>Installa l’app</strong>Aggiungila alla Home</div><button class="ibtn" data-inst="go">Installa</button><button class="ix" data-inst="x" aria-label="Nascondi suggerimento">${IC.close}</button></div>`:'';
+}
+function installSheet(){
+  const ios=isIOS();
+  const share='<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+  const st=ios?[`Tocca il pulsante <strong>Condividi</strong> ${share} nella barra di Safari`,'Scorri e scegli <strong>Aggiungi alla schermata Home</strong>','Conferma con <strong>Aggiungi</strong>: l’icona comparirà nella Home']
+    :['Apri il menu <strong>⋮</strong> del browser in alto a destra','Scegli <strong>Installa app</strong> oppure <strong>Aggiungi a schermata Home</strong>','Conferma: l’icona comparirà nella Home'];
+  const ov=document.createElement('div');ov.className='ov sheet';
+  ov.innerHTML=`<div class="card dlg" role="dialog" aria-modal="true" aria-labelledby="shT"><div class="dlogo">${IC.logo}</div><h2 id="shT">Aggiungi alla Home</h2><p class="note" style="margin-top:0">${ios?'Su iPhone l’installazione si completa da Safari, in tre passaggi:':'Il browser non ha offerto l’installazione automatica. Fai così:'}</p><ol class="steps">${st.map(x=>`<li><span>${x}</span></li>`).join('')}</ol><button class="btn" id="shOk">Ho capito</button></div>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc);};
+  const esc=e=>{if(e.key==='Escape')close();};
+  document.addEventListener('keydown',esc);
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});
+  ov.querySelector('#shOk').onclick=close;ov.querySelector('#shOk').focus();
+}
+async function doInstall(){
+  if(dip){
+    const p=dip;dip=null;
+    try{p.prompt();const r=await p.userChoice;if(r&&r.outcome==='accepted'){try{localStorage.setItem(INSK,String(Date.now()+365*864e5));}catch(x){}renderInstall();return;}}catch(e){}
+    renderInstall();return;
+  }
+  installSheet();
+}
+function setupInstall(){
+  setupManifest();
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;renderInstall();});
+  window.addEventListener('appinstalled',()=>{dip=null;try{localStorage.setItem(INSK,String(Date.now()+365*864e5));}catch(e){}renderInstall();});
+  document.getElementById('install').addEventListener('click',e=>{
+    const b=e.target.closest('[data-inst]');if(!b)return;
+    if(b.dataset.inst==='go')doInstall();
+    else{try{localStorage.setItem(INSK,String(Date.now()));}catch(x){}renderInstall();}
+  });
+  renderInstall();
+}
+
 async function boot(){
   try{
     const r=await api('/api/load');
@@ -1214,6 +1296,7 @@ async function init(){
   app.innerHTML='<p class="note">Caricamento…</p>';
   await boot();
 }
+setupInstall();
 init();
 </script>
 </body>
