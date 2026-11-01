@@ -864,13 +864,13 @@ function dayPanel(c){
 
 /* ---------- schede ---------- */
 function heroHtml(cls,label,big,sub,c){
-  const bar=(l,sp,bu)=>{const p=bu>0?Math.min(100,Math.round(sp/bu*100)):0,r=bu-sp;
-    return `<div class="hbud"><div class="hmeta" style="margin:0 0 6px"><span>${l}</span><span>${r>=0?'Restano '+eur0(r):'Oltre di '+eur0(-r)}</span></div><div class="hprog" role="img" aria-label="${l}: speso il ${p}%"><i style="width:${p}%"></i></div><div class="hmeta"><span>Speso ${eur0(sp)}</span><span>Budget ${eur0(bu)}</span></div></div>`;};
-  let bars=bar('Budget mensile',c.spent,c.budget);
+  const bar=(l,sp,bu)=>{const p=bu>0?Math.min(100,Math.round(sp/bu*100)):0;
+    return `<div class="hbud"><div class="hmeta" style="margin:0 0 6px"><span>${l}</span><span>${eur0(sp)} su ${eur0(bu)}</span></div><div class="hprog" role="img" aria-label="${l}: speso il ${p}%"><i style="width:${p}%"></i></div></div>`;};
+  let bars=bar('Mese',c.spent,c.budget);
   if(c.isCur){
     const n=new Date(),dw=(n.getDay()+6)%7,a=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw)),b=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw+6));
     const sw=rc(state.expenses.filter(e=>e.date>=a&&e.date<=b).reduce((x,e)=>x+e.amount,0));
-    bars=bar('Budget settimanale (lun–dom)',sw,c.budget/c.dim*7)+bars;
+    bars=bar('Settimana',sw,c.budget/c.dim*7)+bars;
   }
   return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p>${bars}</section>`;
 }
@@ -962,16 +962,15 @@ function viewAnno(){
   const cols=months.map((v,i)=>`<div class="col"><div class="b${v>budget?' over':''}" style="height:${Math.round(v/maxV*100)}%"></div><span class="m">${MI[i]}</span></div>`).join('');
   const chart=`<div class="card"><h2>Andamento dei mesi</h2><div class="chart" role="img" aria-label="Spesa per mese rispetto al budget">${cols}<div class="line" style="bottom:${Math.round(budget/maxV*100)}%"></div></div>
   <p class="note" style="margin:0">La linea tratteggiata è il budget mensile di ${eur0(budget)}. Le barre rosse lo superano.</p></div>`;
-  const rows=months.map((v,i)=>{
-    const isC=ay===ny&&i===nm;
-    let txt='',cls='mute';
-    if(isC)txt='in corso';
-    else if(v>0){const d=budget-v;txt=`${eur0(Math.abs(d))} ${d>=0?'sotto':'sopra'}`;cls=d>=0?'ok':'bad';}
-    return `<button class="mrow" data-act="gotoM" data-m="${i}"><span class="mn">${mname(i)}</span><span>${v>0?eur0(v):'—'}</span><span class="d ${cls}">${txt}</span></button>`;
-  }).join('');
-  const list=`<div class="card" style="padding:4px 16px"><div class="note" style="padding:10px 0 2px">Tocca un mese per aprirlo.</div>${rows}</div>`;
-  const sum=`<div class="card"><p style="margin:0">Hai speso <strong>${eur0(total)}</strong> nel ${ay}, in ${tracked} ${tracked===1?'mese':'mesi'} con spese registrate.</p>${total>0?'<button class="link" data-act="spy" style="padding:0;margin-top:6px">Vedi le categorie dell’anno</button>':''}</div>`;
-  return nav+hero+chart+sum+list;
+  const tot={};yexp.forEach(e=>{tot[e.cat]=(tot[e.cat]||0)+e.amount;});
+  const cl=Object.entries(tot).sort((x,y)=>y[1]-x[1]),R=15.9155,col=c=>'var(--cat'+(parseInt((CATK[c]||CATK['Altro'])[0].slice(1),10))+')';
+  let off=0;
+  const arcs=cl.map(([c,v])=>{const f=v/total*100,o=off;off+=f;return `<circle cx="21" cy="21" r="${R}" fill="none" stroke="${col(c)}" stroke-width="6" stroke-dasharray="${Math.max(0,f-(cl.length>1?0.6:0)).toFixed(2)} ${(100-Math.max(0,f-(cl.length>1?0.6:0))).toFixed(2)}" stroke-dashoffset="${(25-o).toFixed(2)}"/>`;}).join('');
+  const leg=cl.map(([c,v])=>`<button class="mrow" data-act="catyear" data-c="${esc(c)}" style="grid-template-columns:auto 1fr auto auto"><span class="cico ${(CATK[c]||CATK['Altro'])[0]}" style="width:28px;height:28px;border-radius:9px">${ico((CATK[c]||CATK['Altro'])[1])}</span><span>${esc(c)}</span><span class="note" style="margin:0">${Math.round(v/total*100)}%</span><strong>${eur0(v)}</strong></button>`).join('');
+  const donut=total>0?`<div class="card"><h2>Dove vanno i soldi nel ${ay}</h2>
+  <div style="position:relative;max-width:220px;margin:4px auto 10px"><svg viewBox="0 0 42 42" role="img" aria-label="Spese del ${ay} per categoria" style="width:100%;display:block">${arcs}</svg><div style="position:absolute;inset:0;display:grid;place-content:center;text-align:center"><strong style="font-size:1.35rem;letter-spacing:-.02em">${eur0(total)}</strong><span class="note" style="margin:0;font-size:.8rem">${tracked} ${tracked===1?'mese':'mesi'}</span></div></div>
+  <div style="padding:0">${leg}</div><p class="note" style="margin:6px 0 0">Tocca una categoria per vedere le sue spese.</p></div>`:`<div class="card"><p class="note" style="margin:0">Nessuna spesa registrata nel ${ay}.</p></div>`;
+  return nav+hero+chart+donut;
 }
 
 function viewAuto(){
@@ -1333,7 +1332,7 @@ function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
   s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
-  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto distingue il budget settimanale (lunedì–domenica) e il budget mensile: per ognuno vedi speso, quota e quanto resta.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
+  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto mostra quanto hai speso nella settimana (lunedì–domenica) e nel mese rispetto al relativo budget.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
   s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
   s('Mensili',['Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
@@ -1772,6 +1771,7 @@ document.addEventListener('click',e=>{
   }else if(a==='wzr'){wz=0;render();
   }else if(a==='qa'){quickAdd();
   }else if(a==='spp'){spP=t.dataset.v;render();
+  }else if(a==='catyear'){tab='spese';spP='y';vy=ay;catFilter=t.dataset.c;render();window.scrollTo(0,0);
   }else if(a==='spy'){tab='spese';spP='y';vy=ay;render();window.scrollTo(0,0);
   }else if(a==='obnext'||a==='obback'||a==='obskip'){obStep(a);
   }else if(a==='obpreset'){const el=document.getElementById('obgoal')||document.getElementById('goal');if(el)el.value=t.dataset.v;
