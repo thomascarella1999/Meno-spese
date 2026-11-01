@@ -87,7 +87,7 @@ h3{font-size:1rem;font-weight:700;margin:24px 0 10px}
 
 /* ---------- controllo segmentato (sotto-schede) ---------- */
 nav.seg{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:16px;padding:4px;margin-bottom:16px}
-nav.seg button{flex:1;min-height:44px;border:0;background:transparent;border-radius:12px;font-weight:600;font-size:.9rem;color:var(--muted);cursor:pointer;transition:background .15s,color .15s}
+nav.seg button{flex:1;min-width:0;padding:0 2px;min-height:44px;border:0;background:transparent;border-radius:12px;font-weight:600;font-size:.82rem;color:var(--muted);cursor:pointer;transition:background .15s,color .15s}
 nav.seg button:hover{color:var(--ink)}
 nav.seg button[aria-current="true"]{background:var(--brand);color:var(--brand-ink);font-weight:700}
 
@@ -109,6 +109,7 @@ nav.seg button[aria-current="true"]{background:var(--brand);color:var(--brand-in
 .hero .sub{margin:0 0 16px;font-size:.92rem;font-weight:500}
 .hprog,.hero .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.28);overflow:hidden}
 .hprog i,.hero .bar>i{display:block;height:100%;border-radius:99px;background:#fff;transition:width .5s ease}
+.hbud+.hbud{margin-top:14px}
 .hmeta{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:.85rem;font-weight:600;font-variant-numeric:tabular-nums}
 
 /* ---------- calendario ---------- */
@@ -297,7 +298,7 @@ const PAYS=['Contanti','PayPal','Carta'];
 const CATS=['Casa','Spesa','Trasporti','Uscite e svago','Abbonamenti','Salute','Altro'];
 const MI=['G','F','M','A','M','G','L','A','S','O','N','D'];
 let state={income:0,goal:0,expenses:[],plan:{}};
-let spP='m',tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
+let aMode='y',aMon=null,spP='m',tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
 const app=document.getElementById('app');
 
 /* ---------- icone (SVG, stesso stile: tratto 2px, angoli arrotondati) ---------- */
@@ -427,7 +428,7 @@ const list=(file,entity,src,F,label)=>T.push({file,entity,idCol:'id',F,label,
 list('expenses.csv','expense','expenses',{date:'S',amount:'n',cat:'S',note:'S',people:'n',total:'n',km:'n',cons:'n',price:'n',fsplit:'b',pay:'s',rb:'s',rbamt:'n',refuel:'b',extra:'b',xd:'s',veh:'n',fr:'j'},c=>c.cat);
 list('vehicles.csv','vehicle','veh',{name:'S',type:'S',cons:'n',price:'n',ins:'s',insMo:'n',tax:'s',insSusp:'s'},c=>c.type);
 list('routes.csv','route','routes',{name:'S',km:'n',days:'n',rt:'b',vid:'n'},()=>'');
-list('fixed_costs.csv','fixed_cost','fixed',{c:'S',name:'S',amt:'n',v:'n'},c=>c.c);
+list('fixed_costs.csv','fixed_cost','fixed',{c:'S',name:'S',amt:'n',v:'n',t:'s',raw:'n',fr:'s'},c=>c.c);
 list('ledger_moves.csv','ledger_move','entries',{date:'S',desc:'S',amt:'n',m:'S',k:'s',rid:'n'},c=>c.m);
 list('paypal_moves.csv','paypal_move','pp',{date:'S',desc:'S',amt:'n',k:'s',rid:'n'},()=>'');
 list('recurring.csv','recurring','rec',{name:'S',amt:'n',day:'n',led:'S',kind:'S',from:'S'},c=>c.kind);
@@ -435,7 +436,7 @@ list('wishlist.csv','wish','wish',{name:'S',price:'n',st:'S',until:'S',d:'S'},c=
 list('cigarettes.csv','cigarette','cig',{date:'S',time:'S',mom:'S'},()=>'');
 const SET=['income','goal','lastPay','car','mainVeh','ppReal','realB','realC','zero','noRoutes','smoke','ver','feat','onb','lastCat'],QUIET=['lastPay','car','ver','lastCat'];
 /* Importi: in memoria euro (sempre multipli di 0,01), nell'archivio centesimi interi (ver 2). */
-const MON={expenses:['amount','total','rbamt'],fixed:['amt'],entries:['amt'],pp:['amt'],rec:['amt'],wish:['price']},MSET=['income','goal','ppReal','realB','realC'];
+const MON={expenses:['amount','total','rbamt'],fixed:['amt','raw'],entries:['amt'],pp:['amt'],rec:['amt'],wish:['price']},MSET=['income','goal','ppReal','realB','realC'];
 const cv=(f,x)=>typeof x==='number'&&isFinite(x)?f(x):x;
 function convert(s,f){
   const o=JSON.parse(JSON.stringify(s));
@@ -614,11 +615,15 @@ function calc(){
 
 /* ---------- componenti ---------- */
 function setupCard(title){
-  const b=budgetOf();
+  const b=budgetOf(),ft=fixedTot();
   return `<div class="card"><h2>${title}</h2>
   ${msg?`<div class="msg" role="alert">${esc(msg)}</div>`:''}
-  <label>Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
-  <label>Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
+  <label>1. Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
+  <h3 style="margin:14px 0 6px">2. Spese fisse: ${eur0(ft)} al mese</h3>
+  <p class="note" style="margin:0 0 8px">Inseriscile prima dell’obiettivo: affitto, bollette, abbonamenti, rate. L’app stima poi quanto puoi risparmiare.</p>
+  <button type="button" class="btn sec" data-act="gofix">${ft>0?'Modifica le spese fisse':'Inserisci le spese fisse'}</button>
+  <h3 style="margin:16px 0 6px">Stima del risparmio</h3>${planInner(state.income,fixItems(),state.goal,true,false,false)}
+  <label style="margin-top:14px">3. Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
   ${b>0?`<p class="note">Budget per le spese: <strong>${eur0(b)}</strong> al mese.</p>`:''}
   <button class="btn" data-act="saveSetup">Salva</button></div>`;
 }
@@ -634,6 +639,57 @@ const fixedTot=()=>rc((state.fixed||[]).reduce((a,f)=>a+f.amt,0)+(state.noRoutes
 const incReg=mk=>{const L=[...(state.entries||[]),...(state.pp||[])].filter(x=>x.k&&x.amt>0&&x.date.startsWith(mk));return L.length?L.reduce((a,x)=>a+x.amt,0):null;};
 const incOf=mk=>{const L=[...(state.entries||[]),...(state.pp||[])].filter(x=>x.k&&x.amt>0&&x.date.startsWith(mk)),S=L.filter(x=>x.k==='S'),A=L.filter(x=>x.k==='A').reduce((a,x)=>a+x.amt,0);return (S.length?S.reduce((a,x)=>a+x.amt,0):state.income)+A;};
 const budgetOf=mk=>Math.max(0,rc(incOf(mk||dkey(new Date()).slice(0,7))-state.goal-fixedTot()));
+/* ---------- stima del risparmio e dove limare ---------- */
+/* tipo: [id, etichetta, categoria in archivio, % limabile (stima prudente), consiglio] */
+const FT=[['affitto','Affitto o mutuo','Casa',0,'Difficile da ridurre nel breve periodo.'],
+ ['bollette','Luce, gas e acqua','Casa',10,'Confronta le offerte e controlla i consumi.'],
+ ['internet','Internet e telefono','Casa',15,'Confronta tariffe e operatori: le offerte nuove costano meno.'],
+ ['abb','Abbonamenti','Abbonamenti',25,'Tieni solo quelli che usi davvero: disdici o condividi.'],
+ ['auto','Auto: assicurazione e rate','Auto',10,'Chiedi preventivi alternativi prima del rinnovo.'],
+ ['altro','Altre spese fisse','Casa',10,'Controlla se sono ancora tutte necessarie.']];
+const ftype=f=>f.t||(f.c==='Abbonamenti'?'abb':f.c==='Auto'?'auto':'altro');
+/* ricorrenza dei pagamenti: [id, etichetta, fattore per ottenere l'importo mensile] */
+const FR=[['g','Ogni giorno',365/12],['s','Ogni settimana',52/12],['m','Ogni mese',1],['a','Ogni anno',1/12]];
+const frOf=f=>f.fr||'m',rawOf=f=>f.raw>0?f.raw:f.amt;
+const frLbl=k=>(FR.find(x=>x[0]===k)||FR[2])[1].toLowerCase();
+const toMonth=(a,k)=>rc(a*(FR.find(x=>x[0]===k)||FR[2])[2]);
+const CARB=['carb','Carburante dei tragitti','',8,'Confronta i prezzi dei distributori e guida in modo regolare.'];
+const fixItems=()=>{const L=(state.fixed||[]).map(f=>({t:ftype(f),name:f.name,amt:f.amt})),r=state.noRoutes?0:routesTot();if(r>0)L.push({t:'carb',name:'Carburante dei tragitti',amt:r});return L;};
+const routesMissing=()=>[...new Set((state.routes||[]).filter(r=>{const v=vById(r.vid);return !(v.cons>0&&v.price>0);}).map(r=>vById(r.vid).name))];
+function savePlan(inc,ft){
+  const free=Math.max(0,rc(inc-ft)),cap=(a,b)=>Math.max(0,Math.floor(Math.min(inc*a,free*b)/5)*5);
+  return{free,low:cap(.10,.25),ideal:cap(.20,.40),high:cap(.30,.55),pct:inc>0?Math.round(ft/inc*100):0};
+}
+function trimList(items){
+  return items.map(i=>{const d=i.t==='carb'?CARB:FT.find(x=>x[0]===i.t)||FT[5];return{name:i.name,amt:i.amt,pct:d[3],save:rc(i.amt*d[3]/100),tip:d[4]};}).filter(x=>x.save>=1).sort((a,b)=>b.save-a.save);
+}
+function topVar(){
+  const n=new Date(),ks=[0,1,2].map(i=>{const d=new Date(n.getFullYear(),n.getMonth()-i,1);return d.getFullYear()+'-'+pad(d.getMonth()+1);});
+  const ex=state.expenses.filter(e=>ks.some(k=>e.date.startsWith(k))),mo=new Set(ex.map(e=>e.date.slice(0,7))).size;
+  if(!mo)return[];
+  const t={};ex.forEach(e=>{t[e.cat]=(t[e.cat]||0)+e.amount;});
+  return Object.entries(t).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([c,v])=>({cat:c,avg:v/mo,save:rc(v/mo*0.1)})).filter(x=>x.save>=1);
+}
+/* contenuto (senza riquadro) della stima: usato nell'avvio guidato e nelle Impostazioni */
+function planInner(inc,items,goal,presets,real,showTrim=true){
+  if(!(inc>0))return '<p class="note" style="margin:0">Inserisci e salva le entrate mensili per vedere la stima.</p>';
+  const ft=rc(items.reduce((a,i)=>a+i.amt,0)),P=savePlan(inc,ft),TL=trimList(items),tv=real?topVar():[];
+  const tot=rc(TL.reduce((a,x)=>a+x.save,0)+tv.reduce((a,x)=>a+x.save,0));
+  const g=goal>0?goal:P.ideal,left=rc(inc-ft-g),wk=52/12,dm=365/12;
+  let h=`<p style="margin:0 0 8px">Entrate <strong>${eur0(inc)}</strong>, spese fisse <strong>${eur0(ft)}</strong> (${P.pct}% delle entrate). Dopo le spese fisse ti restano <strong>${eur0(P.free)}</strong> al mese.</p>`;
+  if(P.pct>=60)h+=`<p class="note" style="margin:0 0 8px">Le spese fisse pesano molto: è da lì che conviene partire.</p>`;
+  if(P.ideal>0){
+    h+=`<p style="margin:0 0 4px">Risparmio ideale: <strong>circa ${eur0(P.ideal)} al mese</strong>.</p><p class="note" style="margin:0 0 8px">È circa il 20% delle entrate, senza superare il 40% di ciò che resta dopo le spese fisse, così la vita di tutti i giorni non si stringe troppo. Prudente ${eur0(P.low)}, ambizioso ${eur0(P.high)}.</p>`;
+    if(left>0)h+=`<p class="note" style="margin:0 0 8px">${goal>0?`Con ${eur0(goal)} da parte`:`Con ${eur0(P.ideal)} da parte`} ti restano ${eur0(left)} al mese per le spese di tutti i giorni: circa ${eur0(left/wk)} a settimana e ${eur0(left/dm)} al giorno.</p>`;
+  }else h+=`<p style="margin:0 0 8px">Le spese fisse assorbono quasi tutte le entrate: prima di fissare un obiettivo conviene ridurle.</p>`;
+  if(showTrim&&(TL.length||tv.length)){
+    h+=`<h3 style="margin:12px 0 6px">Da dove cominciare a limare</h3>`+TL.map(x=>`<div class="exp"><div class="what">${esc(x.name)}<small>${eur0(x.amt)} al mese. ${x.tip}</small></div><span class="amt">−${eur0(x.save)}</span></div>`).join('')+
+      tv.map(x=>`<div class="exp"><div class="what">${esc(x.cat)}<small>In media ${eur0(x.avg)} al mese nelle tue spese. Tagliarla del 10% vale ${eur0(x.save)}.</small></div><span class="amt">−${eur0(x.save)}</span></div>`).join('')+
+      `<p class="note" style="margin:8px 0 0">Potresti liberare circa <strong>${eur0(tot)}</strong> al mese, ${eur0(tot*12)} in un anno. Sono stime indicative, non preventivi.</p>`;
+  }
+  if(presets&&P.ideal>0)h+=`<div class="chips" style="margin:12px 0 0">${[['Prudente',P.low],['Consigliato',P.ideal],['Ambizioso',P.high]].map(([l,v])=>`<button type="button" class="chip" data-act="obpreset" data-v="${v}" style="padding:4px 14px">${l} ${eur0(v)}</button>`).join('')}</div>`;
+  return h;
+}
 const vehs=()=>{if(!state.veh||!state.veh.length){const k=state.car||{cons:0,price:0};state.veh=[{id:1,name:'Auto',type:'auto',cons:k.cons||0,price:k.price||0}];state.mainVeh=1;}return state.veh;};
 const vById=id=>vehs().find(v=>v.id===id)||vehs().find(v=>v.id===state.mainVeh)||vehs()[0];
 const car=()=>{const v=vById(state.mainVeh);return{cons:v.cons||0,price:v.price||0};};
@@ -703,7 +759,7 @@ function dayInfo(c){
   const lim=dayLimit(c,sel),sp=c.perDay[sel],fut=(c.isCur&&sel>c.day)||(!c.isCur&&!c.past);
   if(fut)return `<p class="note" style="margin:-4px 0 8px">Limite stimato: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong> con la situazione attuale.${sp>0?` Già pianificati: ${eur2(sp)}.`:''}</p>`;
   const df=lim-sp;
-  return `<p class="note" style="margin:-4px 0 8px">Limite del giorno: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong>. Speso: <strong>${eur2(sp)}</strong>. Saldo: <strong style="color:${df>=0?'var(--ok)':'var(--bad)'}">${df>=0?'+':'−'}${eur2(Math.abs(df))}</strong>${df<0?' (in negativo)':''}.</p>`;
+  return `<p class="note" style="margin:-4px 0 8px">Limite del giorno: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong>. Speso: <strong>${eur2(sp)}</strong>. ${df>=0?'Ti è rimasto':'Hai superato il limite di'}: <strong style="color:${df>=0?'var(--ok)':'var(--bad)'}">${eur2(Math.abs(df))}</strong>.</p>`;
 }
 function frRows(n,fr){
   let h='';
@@ -813,8 +869,15 @@ function dayPanel(c){
 
 /* ---------- schede ---------- */
 function heroHtml(cls,label,big,sub,c){
-  const p=c.budget>0?Math.min(100,Math.round(c.spent/c.budget*100)):0;
-  return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p><div class="hprog" role="img" aria-label="Speso il ${p}% del budget mensile"><i style="width:${p}%"></i></div><div class="hmeta"><span>Speso ${eur0(c.spent)}</span><span>Budget ${eur0(c.budget)}</span></div></section>`;
+  const bar=(l,sp,bu)=>{const p=bu>0?Math.min(100,Math.round(sp/bu*100)):0;
+    return `<div class="hbud"><div class="hmeta" style="margin:0 0 6px"><span>${l}</span><span>${eur0(sp)} su ${eur0(bu)}</span></div><div class="hprog" role="img" aria-label="${l}: speso il ${p}%"><i style="width:${p}%"></i></div></div>`;};
+  let bars=bar('Mese',c.spent,c.budget);
+  if(c.isCur){
+    const n=new Date(),dw=(n.getDay()+6)%7,a=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw)),b=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw+6));
+    const sw=rc(state.expenses.filter(e=>e.date>=a&&e.date<=b).reduce((x,e)=>x+e.amount,0));
+    bars=bar('Settimana',sw,c.budget/c.dim*7)+bars;
+  }
+  return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p>${bars}</section>`;
 }
 function viewOggi(){
   const c=calc();
@@ -904,16 +967,23 @@ function viewAnno(){
   const cols=months.map((v,i)=>`<div class="col"><div class="b${v>budget?' over':''}" style="height:${Math.round(v/maxV*100)}%"></div><span class="m">${MI[i]}</span></div>`).join('');
   const chart=`<div class="card"><h2>Andamento dei mesi</h2><div class="chart" role="img" aria-label="Spesa per mese rispetto al budget">${cols}<div class="line" style="bottom:${Math.round(budget/maxV*100)}%"></div></div>
   <p class="note" style="margin:0">La linea tratteggiata è il budget mensile di ${eur0(budget)}. Le barre rosse lo superano.</p></div>`;
-  const rows=months.map((v,i)=>{
-    const isC=ay===ny&&i===nm;
-    let txt='',cls='mute';
-    if(isC)txt='in corso';
-    else if(v>0){const d=budget-v;txt=`${eur0(Math.abs(d))} ${d>=0?'sotto':'sopra'}`;cls=d>=0?'ok':'bad';}
-    return `<button class="mrow" data-act="gotoM" data-m="${i}"><span class="mn">${mname(i)}</span><span>${v>0?eur0(v):'—'}</span><span class="d ${cls}">${txt}</span></button>`;
-  }).join('');
-  const list=`<div class="card" style="padding:4px 16px"><div class="note" style="padding:10px 0 2px">Tocca un mese per aprirlo.</div>${rows}</div>`;
-  const sum=`<div class="card"><p style="margin:0">Hai speso <strong>${eur0(total)}</strong> nel ${ay}, in ${tracked} ${tracked===1?'mese':'mesi'} con spese registrate.</p>${total>0?'<button class="link" data-act="spy" style="padding:0;margin-top:6px">Vedi le categorie dell’anno</button>':''}</div>`;
-  return nav+hero+chart+sum+list;
+  let mi=aMon;
+  if(mi===null){mi=ay===ny?nm:0;if(ay!==ny)months.forEach((v,i)=>{if(v>0)mi=i;});}
+  aMon=mi;
+  const src=aMode==='y'?yexp:yexp.filter(e=>parseInt(e.date.slice(5,7),10)-1===mi),dTot=rc(src.reduce((a,e)=>a+e.amount,0));
+  const tot={};src.forEach(e=>{tot[e.cat]=(tot[e.cat]||0)+e.amount;});
+  const cl=Object.entries(tot).sort((x,y)=>y[1]-x[1]),R=15.9155,col=c=>'var(--cat'+(parseInt((CATK[c]||CATK['Altro'])[0].slice(1),10))+')';
+  const seg=`<nav class="seg" aria-label="Periodo del grafico">${[['y','Anno'],['m','Mese']].map(([v,l])=>`<button data-act="adm" data-v="${v}" ${aMode===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
+  const mnav=aMode==='m'?`<div class="mnav" style="margin-bottom:12px"><button class="nbtn" data-act="apm" aria-label="Mese precedente">${IC.l}</button><strong style="text-transform:capitalize">${mname(mi)} ${ay}</strong><button class="nbtn" data-act="anm" aria-label="Mese successivo">${IC.r}</button></div>`:'';
+  const ttl=aMode==='y'?`Dove vanno i soldi nel ${ay}`:`Dove vanno i soldi a ${mname(mi)}`;
+  let off=0;
+  const arcs=cl.map(([c,v])=>{const f=v/dTot*100,o=off;off+=f;const w=Math.max(0,f-(cl.length>1?0.6:0));return `<circle cx="21" cy="21" r="${R}" fill="none" stroke="${col(c)}" stroke-width="6" stroke-dasharray="${w.toFixed(2)} ${(100-w).toFixed(2)}" stroke-dashoffset="${(25-o).toFixed(2)}"/>`;}).join('');
+  const leg=cl.map(([c,v])=>`<button class="mrow" data-act="catyear" data-c="${esc(c)}" style="grid-template-columns:auto 1fr auto auto"><span class="cico ${(CATK[c]||CATK['Altro'])[0]}" style="width:28px;height:28px;border-radius:9px">${ico((CATK[c]||CATK['Altro'])[1])}</span><span>${esc(c)}</span><span class="note" style="margin:0">${Math.round(v/dTot*100)}%</span><strong>${eur0(v)}</strong></button>`).join('');
+  const sub=aMode==='y'?`${tracked} ${tracked===1?'mese':'mesi'}`:`${src.length} ${src.length===1?'spesa':'spese'}`;
+  const donut=`<div class="card"><h2>${ttl}</h2>${seg}${mnav}`+(dTot>0?`
+  <div style="position:relative;max-width:220px;margin:4px auto 10px"><svg viewBox="0 0 42 42" role="img" aria-label="${esc(ttl)}" style="width:100%;display:block">${arcs}</svg><div style="position:absolute;inset:0;display:grid;place-content:center;text-align:center"><strong style="font-size:1.35rem;letter-spacing:-.02em">${eur0(dTot)}</strong><span class="note" style="margin:0;font-size:.8rem">${sub}</span></div></div>
+  <div style="padding:0">${leg}</div><p class="note" style="margin:6px 0 0">Tocca una categoria per vedere le sue spese.</p></div>`:`<p class="note" style="margin:0">Nessuna spesa registrata ${aMode==='y'?'nel '+ay:'a '+mname(mi)}.</p></div>`);
+  return nav+hero+chart+donut;
 }
 
 function viewAuto(){
@@ -978,12 +1048,20 @@ function viewCat(){
 
 function fixedCard(cat,vid){
   const L=(state.fixed||[]).filter(f=>f.c===cat&&(vid?(f.v===vid||(!f.v&&vid===state.mainVeh)):!f.v)),fe=fixEdit&&L.find(x=>x.id===fixEdit);
-  const rows=L.map(f=>`<div class="exp"><div class="what">${esc(f.name)}</div><span class="amt">${eur2(f.amt)}</span><button class="link" data-act="fedit" data-id="${f.id}">Modifica</button><button class="link" data-act="fdel" data-id="${f.id}">Elimina</button></div>`).join('');
-  return `<div class="card"><h2>${vid?'Spese fisse':cat}: ${eur2(L.reduce((a,f)=>a+f.amt,0))} al mese</h2>${rows||`<p class="note" style="margin:0 0 8px">${cat==='Auto'?'Aggiungi assicurazione, rata, parcheggio. Per spese annuali, come il bollo, inserisci la quota mensile.':'Aggiungi i tuoi abbonamenti mensili.'}</p>`}
+  const rows=L.map(f=>`<div class="exp"><div class="what">${esc(f.name)}<small>${frLbl(frOf(f))}${frOf(f)!=='m'?' · '+eur0(f.amt)+'/mese':''}</small></div><span class="amt">${eur2(rawOf(f))}</span><button class="link" data-act="fedit" data-id="${f.id}" aria-label="Modifica ${esc(f.name)}">Modifica</button><button class="link" data-act="fdel" data-id="${f.id}" aria-label="Elimina ${esc(f.name)}">Elimina</button></div>`).join('');
+  const hint=cat==='Auto'?'Aggiungi assicurazione, rata, parcheggio. Per ogni voce scegli ogni quanto la paghi.':cat==='Casa'?'Aggiungi affitto o mutuo, bollette, internet e telefono. Per ogni voce scegli ogni quanto la paghi.':'Aggiungi i tuoi abbonamenti e scegli ogni quanto li paghi.';
+  return `<div class="card"><h2>${vid?'Spese fisse':cat==='Casa'?'Casa e altre spese fisse':cat}: ${eur2(L.reduce((a,f)=>a+f.amt,0))} al mese</h2>${rows||`<p class="note" style="margin:0 0 8px">${hint}</p>`}
   <h3>${fe?'Modifica voce':'Nuova voce'}</h3><div class="msg" id="ferr" role="alert" hidden></div>
   <label>Nome<input id="fname" maxlength="30" value="${fe?esc(fe.name):''}"></label>
-  <label>Importo al mese (€)<input id="famt" inputmode="decimal" placeholder="0,00" value="${fe?fv(fe.amt):''}"></label>
+  ${cat==='Casa'?`<label>Tipo<select id="ftype">${FT.filter(x=>x[2]==='Casa').map(x=>`<option value="${x[0]}"${(fe?ftype(fe):'altro')===x[0]?' selected':''}>${x[1]}</option>`).join('')}</select></label>`:''}
+  <div class="row"><label>Importo (€)<input id="famt" inputmode="decimal" placeholder="0,00" value="${fe?fv(rawOf(fe)):''}"></label><label>Ricorrenza<select id="ffr">${FR.map(x=>`<option value="${x[0]}"${(fe?frOf(fe):'m')===x[0]?' selected':''}>${x[1]}</option>`).join('')}</select></label></div>
+  <p class="note" id="fpv" style="margin:-4px 0 10px"></p>
   <button class="btn" data-act="fadd" data-c="${cat}" data-v="${vid||''}">${fe?'Salva modifica':'Aggiungi'}</button></div>`;
+}
+function updFpv(){
+  const o=document.getElementById('fpv'),a=document.getElementById('famt'),f=document.getElementById('ffr');if(!o||!a||!f)return;
+  const v=mon(a.value);
+  o.textContent=v>0&&f.value!=='m'?`Equivale a circa ${eur2(toMonth(v,f.value))} al mese.`:'';
 }
 
 function refuelCard(){
@@ -1031,12 +1109,6 @@ function viewConti(){
   <div class="card"><h2>Nuovo movimento</h2><p class="note" style="margin-top:0">Le spese con “Pagato con” compaiono già qui da sole: usa questo modulo solo per entrate, prelievi e trasferimenti.</p><div class="msg" id="${pf}err" role="alert" hidden></div><label>Giorno<input id="${pf}dt" type="date" value="${td}"></label><div class="row"><label>Tipo<select id="${pf}k">${ty.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><label>Importo (€)<input id="${pf}amt" inputmode="decimal" placeholder="0,00"></label></div><label>Natura, se è un’entrata<select id="${pf}c"><option value="">Altro o trasferimento</option><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label><label>Descrizione (facoltativa)<input id="${pf}desc" maxlength="40"></label><button class="btn" data-act="${k==='P'?'ppadd':'eadd'}">Aggiungi movimento</button></div>`;
 }
 
-function updEst(){
-  const o=document.getElementById('estOut');if(!o)return;
-  const k=num(document.getElementById('ekm').value),c=num(document.getElementById('vcons').value),p=num(document.getElementById('vprice').value);
-  o.textContent=k>0&&c>0?`${n1(k/c)} litri${p>0?`, circa ${eur2(k/c*p)}`:''} (${fmtCons(c)}).`:'';
-}
-
 function refuelV(vo){
   const R=state.expenses.filter(e=>(e.veh?vById(e.veh).id:state.mainVeh)===vo.id&&(e.refuel||/carburante|rifornimento/i.test(e.note||''))).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
   if(!R.length)return `<div class="card"><h2>Rifornimenti</h2><p class="note" style="margin:0">Spunta “Rifornimento” quando registri una spesa e scegli questo veicolo: qui vedrai i km che dovresti fare.</p></div>`;
@@ -1049,12 +1121,25 @@ function refuelV(vo){
   return `<div class="card"><h2>Rifornimenti</h2><p style="margin:0 0 4px">Ultimo: ${dfmt(cur.e.date)}, ${eur2(cur.e.total||cur.e.amount)}</p><div class="note">${cu}</div>${old.length?`<h3>Cronologia</h3>${old.map(x=>`<div class="exp"><div class="what">${dfmt(x.e.date)}, ${eur2(x.e.total||x.e.amount)}<small>previsti ${fmtKm(Math.round(x.exp))} km, fatti ${fmtKm(x.done)} km</small></div></div>`).join('')}`:''}</div>`;
 }
 
-function viewVeicoli(){
+const vehReady=v=>!!v&&v.cons>0&&v.price>0;
+const anyVehReady=()=>vehs().some(vehReady);
+function vehGate(what){
+  return `<div class="card"><h2>Prima imposta il veicolo</h2><p style="margin:0 0 10px">${what} Vai in Impostazioni e inserisci consumo e prezzo del carburante.</p><button class="btn" data-act="gotoveic">Configura il veicolo</button></div>`;
+}
+function viewAutoTab(){
   const V=vehs(),vo=V.find(v=>v.id===vopen)||vById(state.mainVeh),mid=state.mainVeh;
-  const list=V.map(v=>`<div class="exp"><div class="what">${esc(v.name)}${v.id===mid?' (principale)':''}<small style="white-space:normal">${v.type==='moto'?'Moto':'Auto'}${v.cons>0?', '+fmtCons(v.cons):''}<br>${scadLine(v)}</small></div><button class="link" data-act="vopen" data-id="${v.id}">${v.id===vo.id?'Aperto':'Apri'}</button>${v.id===mid?'':`<button class="link" data-act="vmain" data-id="${v.id}">Principale</button>`}${V.length>1?`<button class="link" data-act="vdel" data-id="${v.id}">Elimina</button>`:''}</div>`).join('');
-  const rt=(state.routes||[]).filter(r=>vById(r.vid).id===vo.id),rc=rt.reduce((a,r)=>a+routeCost(r),0);
   const ex=state.expenses.filter(e=>e.extra&&(e.veh?vById(e.veh).id:mid)===vo.id).sort((a,b)=>b.date.localeCompare(a.date));
-  return `<div class="card"><h2>I tuoi veicoli</h2>${list}<h3>Nuovo veicolo</h3><div class="msg" id="verr" role="alert" hidden></div>
+  const chips=V.length>1?`<div class="chips">${V.map(v=>`<button type="button" class="chip" data-act="vopen" data-id="${v.id}" aria-pressed="${v.id===vo.id}" style="padding:4px 14px">${esc(v.name)}</button>`).join('')}</div>`:'';
+  const gate=vehReady(vo)?'':vehGate(`Per ${esc(vo.name)} mancano i dati del carburante: senza non posso stimare i km dei rifornimenti.`);
+  return chips+gate+`  ${scadCard(vo)}${fixedCard('Auto',vo.id)}${refuelV(vo)}
+  <div class="card"><h2>Spese straordinarie: ${eur2(ex.reduce((a,e)=>a+e.amount,0))}</h2>${ex.map(e=>`<div class="exp"><div class="what">${esc(e.xd||e.cat)}<small>${dfmt(e.date)}${e.pay?' – con '+e.pay:''}</small></div><span class="amt">${eur2(e.amount)}</span></div>`).join('')||'<p class="note" style="margin:0">Attiva “Spesa straordinaria del veicolo” quando registri una spesa.</p>'}</div>`;
+}
+
+function viewVeicoliSetup(){
+  const V=vehs(),vo=V.find(v=>v.id===vopen)||vById(state.mainVeh),mid=state.mainVeh;
+  const list=V.map(v=>`<div class="exp"><div class="what">${esc(v.name)}${v.id===mid?' (principale)':''}<small style="white-space:normal">${v.type==='moto'?'Moto':'Auto'}${v.cons>0?', '+fmtCons(v.cons):''}${vehReady(v)?'':' · da completare'}<br>${scadLine(v)}</small></div><button class="link" data-act="vopen" data-id="${v.id}">${v.id===vo.id?'Aperto':'Apri'}</button>${v.id===mid?'':`<button class="link" data-act="vmain" data-id="${v.id}">Principale</button>`}${V.length>1?`<button class="link" data-act="vdel" data-id="${v.id}">Elimina</button>`:''}</div>`).join('');
+  const rt=(state.routes||[]).filter(r=>vById(r.vid).id===vo.id),rtc=rt.reduce((a,r)=>a+routeCost(r),0);
+  return `<div id="veh"><h3>Veicoli</h3><div class="card"><h2>I tuoi veicoli</h2><p class="note" style="margin-top:0">Servono consumo e prezzo del carburante: senza, non puoi creare i tragitti fissi.</p>${list}<h3>Nuovo veicolo</h3><div class="msg" id="verr" role="alert" hidden></div>
   <div class="row"><label>Nome<input id="vname" maxlength="24" placeholder="es. Golf"></label><label>Tipo<select id="vtype"><option value="auto">Auto</option><option value="moto">Moto</option></select></label></div>
   <button class="btn" data-act="vadd">Aggiungi veicolo</button></div>
   <h3>${esc(vo.name)}</h3>
@@ -1063,10 +1148,8 @@ function viewVeicoli(){
   <div class="row"><label>Consumo (km/l)<input id="vcons" inputmode="decimal" placeholder="18" value="${fv(vo.cons)}"></label><label>Consumo (l/100 km)<input id="vcl100" inputmode="decimal" placeholder="5,6" value="${l100v(vo.cons)}"></label></div>
   <label>Prezzo carburante (€/litro)<input id="vprice" inputmode="decimal" placeholder="1,75" value="${fv(vo.price)}"></label>
   <button class="btn" data-act="saveVeh" data-id="${vo.id}">Salva</button>
-  <h3>Quanto consuma</h3><label>Km da percorrere<input id="ekm" inputmode="decimal" placeholder="100"></label><p class="note" id="estOut" style="margin:0"></p>
-  ${rt.length?`<p class="note" style="margin:8px 0 0">Con i tragitti fissi: circa ${eur0(rc)} al mese.</p>`:''}</div>
-  ${scadCard(vo)}${fixedCard('Auto',vo.id)}${refuelV(vo)}
-  <div class="card"><h2>Spese straordinarie: ${eur2(ex.reduce((a,e)=>a+e.amount,0))}</h2>${ex.map(e=>`<div class="exp"><div class="what">${esc(e.xd||e.cat)}<small>${dfmt(e.date)}${e.pay?' – con '+e.pay:''}</small></div><span class="amt">${eur2(e.amount)}</span></div>`).join('')||'<p class="note" style="margin:0">Attiva “Spesa straordinaria del veicolo” quando registri una spesa.</p>'}</div>`;
+  ${rt.length?`<p class="note" style="margin:8px 0 0">Con i tragitti fissi: circa ${eur0(rtc)} al mese.</p>`:''}</div>
+</div>`;
 }
 
 function scadSt(d,f){
@@ -1108,25 +1191,28 @@ function scadCard(vo){
 }
 
 function viewTragitti(){
-  const R=state.routes||[],V=vehs(),re=routeEdit?R.find(x=>x.id===routeEdit):null;
+  const R=state.routes||[],V=vehs(),re=routeEdit?R.find(x=>x.id===routeEdit):null,canNew=anyVehReady()||!!re;
   const kd=r=>r.km*(r.rt?2:1),wk=r=>r.days*52/12;
   const rows=R.map(r=>{const c=routeCost(r);return `<div class="exp"><div class="what">${esc(r.name)}<small>${esc(vById(r.vid).name)}, ${fmtKm(kd(r))} km al giorno, ${r.days} giorni a settimana${c>0?`, circa ${eur0(c)} al mese`:''}</small></div><button class="link" data-act="redit" data-id="${r.id}">Modifica</button><button class="link" data-act="rdel" data-id="${r.id}">Elimina</button></div>`;}).join('');
   const tm=routesTot(),tl=R.reduce((a,r)=>{const v=vById(r.vid);return a+(v.cons>0?kd(r)/v.cons*wk(r):0);},0);
-  return `<div class="card"><h2>Tragitti fissi</h2>${rows||'<p class="note" style="margin:0">Aggiungi un tragitto abituale, ad esempio casa e lavoro.</p>'}${R.length&&tm>0?`<p class="note" style="margin:8px 0 0">Stima totale: ${eur0(tm)} al mese e ${eur0(tm*12)} all’anno, circa ${n1(tl)} litri al mese.</p>`:''}
+  const mm=routesMissing(),warnR=mm.length?`<div class="card"><p style="margin:0 0 8px"><strong>Il carburante non viene contato.</strong> Per ${mm.map(esc).join(', ')} mancano consumo o prezzo del carburante: finché non li inserisci, i tragitti costano 0 € nel budget.</p><button class="btn sec" data-act="gotoveic">Apri Veicoli</button></div>`:'';
+  return warnR+`<div class="card"><h2>Tragitti fissi</h2>${rows||'<p class="note" style="margin:0">Aggiungi un tragitto abituale, ad esempio casa e lavoro.</p>'}${R.length&&tm>0?`<p class="note" style="margin:8px 0 0">Stima totale: ${eur0(tm)} al mese e ${eur0(tm*12)} all’anno, circa ${n1(tl)} litri al mese.</p>`:''}
   <label class="check tg"><input type="checkbox" id="rtb" ${state.noRoutes?'':'checked'}><span>Conta il carburante dei tragitti nel budget</span></label></div>
-  <div class="card"><h3 style="margin:0 0 8px">${re?'Modifica tragitto':'Nuovo tragitto'}</h3><div class="msg" id="rerr" role="alert" hidden></div>
+  ${canNew?`<div class="card"><h3 style="margin:0 0 8px">${re?'Modifica tragitto':'Nuovo tragitto'}</h3><div class="msg" id="rerr" role="alert" hidden></div>
   <label>Nome<input id="rname" maxlength="30" placeholder="Casa – lavoro" value="${re?esc(re.name):''}"></label>
-  <label>Veicolo<select id="rveh">${V.map(v=>`<option value="${v.id}"${(re?vById(re.vid).id:state.mainVeh)===v.id?' selected':''}>${esc(v.name)}</option>`).join('')}</select></label>
+  <label>Veicolo<select id="rveh">${V.filter(v=>vehReady(v)||(re&&vById(re.vid).id===v.id)).map(v=>`<option value="${v.id}"${(re?vById(re.vid).id:state.mainVeh)===v.id?' selected':''}>${esc(v.name)}</option>`).join('')}</select></label>
   <div class="row"><label>Km di andata<input id="rkm" inputmode="decimal" placeholder="12" value="${re?fv(re.km):''}"></label><label>Giorni a settimana<input id="rdays" inputmode="numeric" placeholder="5" value="${re?re.days:5}"></label></div>
   <label class="check tg"><input type="checkbox" id="rrt" ${!re||re.rt?'checked':''}><span>Andata e ritorno</span></label>
-  <button class="btn" data-act="radd">${re?'Salva modifica':'Aggiungi tragitto'}</button></div>`;
+  <button class="btn" data-act="radd">${re?'Salva modifica':'Aggiungi tragitto'}</button></div>`:vehGate('Per creare un tragitto serve un veicolo configurato.')}`;
 }
 
 function viewMensili(){
   const ft=fixedTot(),b=Math.max(0,incOf(dkey(new Date()).slice(0,7))-state.goal);
-  const sw=`<nav class="seg">${[['auto','Veicoli'],['tr','Tragitti'],['abb','Abbonamenti']].map(([v,l])=>`<button data-act="ms" data-v="${v}" ${msub===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
-  const head=b>0?`<div class="card"><p style="margin:0">Spese fisse: <strong>${eur0(ft)}</strong> al mese${routesTot()>0?`, di cui ${eur0(routesTot())} di carburante dei tragitti`:''}. Il budget per le altre spese scende a <strong>${eur0(Math.max(0,b-ft))}</strong> e abbassa il limite giornaliero.</p></div>`:'';
-  return sw+head+(msub==='auto'?viewVeicoli():msub==='tr'?viewTragitti():fixedCard('Abbonamenti'));
+  const sw=`<nav class="seg">${[['fix','Casa'],['auto','Auto'],['tr','Tragitti'],['abb','Abbonamenti']].map(([v,l])=>`<button data-act="ms" data-v="${v}" ${msub===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
+  const fl=[...(state.fixed||[])].sort((x,y)=>y.amt-x.amt),rtc=state.noRoutes?0:routesTot();
+  const fr=fl.map(f=>`<div class="exp"><div class="what">${esc(f.name)}<small>${esc(f.c==='Auto'?'Auto':f.c)} · ${frOf(f)==='m'?'ogni mese':eur2(rawOf(f))+' '+frLbl(frOf(f))}</small></div><span class="amt">${eur2(f.amt)}</span></div>`).join('')+(rtc>0?`<div class="exp"><div class="what">Carburante dei tragitti<small>Tragitti · ogni mese</small></div><span class="amt">${eur2(rtc)}</span></div>`:'');
+  const head=(ft>0||b>0)?`<div class="card"><p style="margin:0 0 ${ft>0?8:0}px">Spese fisse: <strong>${eur0(ft)}</strong> al mese${ft>0?', tutte le ricorrenze impostate:':'.'}</p>${fr}${b>0?`<p class="note" style="margin:8px 0 0">Il budget per le altre spese scende a <strong>${eur0(Math.max(0,b-ft))}</strong> e abbassa il limite giornaliero.</p>`:''}</div>`:'';
+  return sw+head+(msub==='auto'?viewAutoTab():msub==='tr'?viewTragitti():msub==='fix'?fixedCard('Casa'):fixedCard('Abbonamenti'));
 }
 
 function zeroCard(){
@@ -1169,8 +1255,107 @@ function applyRec(silent){
   });
   if(ch)save(silent);
 }
+/* ---------- importazione spese da file CSV ---------- */
+let imp=null;
+const IMPCOLS={date:['data','date','giorno','data operazione','data valuta','data contabile'],amount:['importo','amount','uscita','uscite','spesa','totale','costo','prezzo','euro','dare'],cat:['categoria','category','tipo','tipologia'],note:['nota','note','descrizione','description','causale','dettaglio','esercente'],pay:['pagato con','pagamento','metodo','modalita','metodo di pagamento','conto','strumento']};
+const nrm=x=>String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toLowerCase();
+function csvRows(t){
+  t=t.replace(/^﻿/,'');
+  const first=t.split(/\r?\n/)[0]||'',d=[';','\t',','].map(c=>[c,first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rs=[];let r=[],f='',q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;
+    else if(c===d){r.push(f);f='';}
+    else if(c==='\n'){r.push(f);rs.push(r);r=[];f='';}
+    else if(c!=='\r')f+=c;
+  }
+  if(f!==''||r.length){r.push(f);rs.push(r);}
+  return rs.filter(r=>r.some(x=>String(x).trim()!==''));
+}
+function impDate(v){
+  v=String(v||'').trim().replace(/[T ]\d{1,2}:\d{2}.*$/,'');
+  let y,m,d,x;
+  if(x=v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/)){y=+x[1];m=+x[2];d=+x[3];}
+  else if(x=v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/)){d=+x[1];m=+x[2];y=+x[3];if(y<100)y+=2000;}
+  else return null;
+  const dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d?y+'-'+pad(m)+'-'+pad(d):null;
+}
+function impAmt(v){
+  let t=String(v==null?'':v).replace(/[€\s ]|eur/gi,'');
+  if(!t)return NaN;
+  let neg=false;
+  if(/^\(.*\)$/.test(t)){neg=true;t=t.slice(1,-1);}
+  if(t[0]==='-'){neg=true;t=t.slice(1);}else if(t[0]==='+')t=t.slice(1);
+  if(t.includes(',')&&t.includes('.'))t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+  else if(t.includes(','))t=t.replace(',','.');
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  if(!/^\d+(\.\d+)?$/.test(t))return NaN;
+  return (neg?-1:1)*rc(parseFloat(t));
+}
+function impParse(text){
+  const R=csvRows(text);
+  if(R.length<2)return{err:'Il file è vuoto o ha solo l’intestazione.'};
+  const H=R[0].map(nrm),col={};
+  for(const k in IMPCOLS){let j=H.findIndex(h=>IMPCOLS[k].includes(h));if(j<0)j=H.findIndex(h=>IMPCOLS[k].some(a=>a.length>3&&h.includes(a)));if(j>=0&&!Object.values(col).includes(j))col[k]=j;}
+  if(col.date===undefined||col.amount===undefined)return{err:`Non trovo le colonne Data e Importo. Colonne trovate: ${R[0].map(x=>String(x).trim()).filter(Boolean).join(', ')||'nessuna'}. Scarica il modello per vedere il formato.`};
+  const body=R.slice(1),raw=body.map(r=>impAmt(r[col.amount])),nonzero=raw.filter(x=>x!==0&&!isNaN(x)),allNeg=nonzero.length>0&&nonzero.every(x=>x<0);
+  const have=new Set(state.expenses.map(e=>[e.date,e.amount,e.cat,e.note||''].join('|')));
+  const ok=[],bad=[];let dup=0;
+  body.forEach((r,i)=>{
+    const date=impDate(r[col.date]),a=raw[i],line=i+2;
+    if(!date){bad.push(`riga ${line}: data non valida`);return;}
+    if(isNaN(a)){bad.push(`riga ${line}: importo non valido`);return;}
+    const amount=allNeg?-a:a;
+    if(!(amount>0)){bad.push(`riga ${line}: importo ${allNeg?'non negativo':'zero o negativo'}, saltata`);return;}
+    const c0=String(col.cat!==undefined?r[col.cat]:'').trim(),cat=CATS.find(x=>nrm(x)===nrm(c0))||'Altro';
+    let note=String(col.note!==undefined?r[col.note]:'').trim();
+    if(c0&&cat==='Altro'&&nrm(c0)!=='altro')note=note?c0+' – '+note:c0;
+    note=note.slice(0,60);
+    const x={date,amount,cat,note};
+    const pt=nrm(col.pay!==undefined?r[col.pay]:'');
+    const pay=!pt?'':pt.includes('paypal')?'PayPal':pt.includes('contant')||pt.includes('cash')?'Contanti':(pt.includes('carta')||pt.includes('card')||pt.includes('bancomat')||pt.includes('visa')||pt.includes('mastercard'))?'Carta':'';
+    if(pay)x.pay=pay;
+    if(have.has([date,amount,cat,note].join('|'))){dup++;return;}
+    ok.push(x);
+  });
+  return{ok,bad,dup,allNeg,total:rc(ok.reduce((a,x)=>a+x.amount,0))};
+}
+async function impLoad(file){
+  if(!file)return;
+  try{
+    const buf=await file.arrayBuffer();let text;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){text=new TextDecoder('windows-1252').decode(buf);}
+    imp=Object.assign({name:file.name},impParse(text));
+  }catch(e){imp={err:'Non riesco a leggere il file.'};}
+  render();
+}
+function impGo(){
+  if(!imp||!imp.ok||!imp.ok.length)return;
+  const snap=JSON.stringify(state),n=imp.ok.length,t0=Date.now();
+  imp.ok.forEach((x,i)=>state.expenses.push({id:t0+i,...x}));
+  const last=imp.ok.map(x=>x.date).sort().pop();vy=+last.slice(0,4);vm=+last.slice(5,7)-1;sel=null;
+  imp=null;save();render();
+  showToast(`Importate ${n} spese`,'Annulla',()=>{state=JSON.parse(snap);save();render();});
+}
+function impCard(){
+  const r=imp,head=`<h2>Importa spese da CSV</h2>`;
+  const base=`<p class="note" style="margin-top:0">Carica un file CSV (anche esportato da Excel) con almeno le colonne <strong>Data</strong> e <strong>Importo</strong>. Facoltative: Categoria, Nota, Pagato con. Le spese già presenti, identiche per data, importo, categoria e nota, vengono saltate.</p>`;
+  const btns=`<div class="row"><button class="btn" data-act="imppick">Scegli file CSV</button><button class="btn sec" data-act="impmodel">Scarica modello</button></div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" style="display:none">`;
+  if(!r)return `<div class="card">${head}${base}${btns}</div>`;
+  if(r.err)return `<div class="card">${head}<div class="msg" role="alert">${esc(r.err)}</div>${btns}</div>`;
+  const ex=r.ok.slice(0,5).map(x=>`<div class="exp">${catIco(x.cat)}<div class="what">${esc(x.cat)}<small>${dfmt(x.date)}${x.note?' – '+esc(x.note):''}${x.pay?' – '+x.pay:''}</small></div><span class="amt">${eur2(x.amount)}</span></div>`).join('');
+  return `<div class="card">${head}<p style="margin:0 0 6px"><strong>${esc(r.name)}</strong>: ${r.ok.length} ${r.ok.length===1?'spesa pronta':'spese pronte'} per un totale di <strong>${eur2(r.total)}</strong>.</p>
+  ${r.allNeg?'<p class="note" style="margin:0 0 6px">Gli importi del file sono negativi: li ho letti come spese.</p>':''}
+  ${r.dup?`<p class="note" style="margin:0 0 6px">${r.dup} già presenti: saltate.</p>`:''}
+  ${r.bad.length?`<p class="note" style="margin:0 0 6px">${r.bad.length} righe non importabili (${esc(r.bad.slice(0,3).join('; '))}${r.bad.length>3?'…':''}).</p>`:''}
+  ${ex}${r.ok.length>5?`<p class="note" style="margin:6px 0 0">…e altre ${r.ok.length-5}.</p>`:''}
+  <div class="row" style="margin-top:12px"><button class="btn sec" data-act="impcancel">Annulla</button>${r.ok.length?`<button class="btn" data-act="impgo">Importa ${r.ok.length}</button>`:'<button class="btn" data-act="imppick">Scegli un altro file</button>'}</div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" style="display:none"></div>`;
+}
 function viewImpostazioni(){
-  return `${entrateCard()}${zeroCard()}${featCard()}
+  return `${entrateCard()}${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
   <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
@@ -1180,13 +1365,13 @@ function viewImpostazioni(){
 function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
-  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
-  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
+  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Ricorrenti, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
+  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto mostra quanto hai speso nella settimana (lunedì–domenica) e nel mese rispetto al relativo budget.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
   s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
-  s('Mensili',['Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
+  s('Ricorrenti',['Qui metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Impostazioni: funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, obiettivo, punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, stima del risparmio e obiettivo (dopo le spese fisse), punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
@@ -1278,11 +1463,12 @@ let wz=0;
 function checks(){
   const S=[],td=dkey(new Date()),ex=state.expenses,V=vehs(),add=(t,ok,msg,fix)=>S.push({t,ok,msg,fix});
   add('Entrate e obiettivo',state.income>0&&state.goal>=0&&state.goal<state.income,state.income>0&&state.goal<state.income?'Entrate mensili e obiettivo di risparmio impostati.':'Mancano le entrate mensili previste, oppure l’obiettivo è troppo alto.',{l:'Apri Impostazioni',a:'gotoimp'});
+  add('Spese fisse',fixedTot()>0,fixedTot()>0?`Spese fisse inserite: ${eur0(fixedTot())} al mese.`:'Non hai inserito spese fisse: senza, la stima del risparmio e il budget sono troppo ottimistici.',fixedTot()>0?null:{l:'Inserisci le spese fisse',a:'gofix'});
   add('Punto zero',!!state.zero,state.zero?`Punto zero al ${dfmt(state.zero.date)}.`:'Nessun punto zero: i saldi dei conti partono da zero.',{l:'Imposta il punto zero',a:'gotoimp'});
   const v0=vById(state.mainVeh),vo=v0.cons>0&&v0.price>0;
-  add('Veicolo principale',vo,vo?`${esc(v0.name)}: consumo e prezzo del carburante impostati.`:`Per ${esc(v0.name)} mancano consumo o prezzo del carburante.`,{l:'Apri Veicoli',a:'gotoveic'});
+  add('Veicolo principale',vo,vo?`${esc(v0.name)}: consumo e prezzo del carburante impostati.`:`Per ${esc(v0.name)} mancano consumo o prezzo del carburante.`,{l:'Apri Impostazioni',a:'gotoveic'});
   const od=V.filter(v=>(v.ins&&!v.insSusp&&v.ins<td)||(v.tax&&v.tax<td)).map(v=>v.name),nd=V.filter(v=>!v.ins||!v.tax).map(v=>v.name);
-  add('Scadenze',!od.length&&!nd.length,od.length?`Scadute per: ${od.join(', ')}. Se le hai pagate, premi “Segna come pagata”.`:nd.length?`Da inserire per: ${nd.join(', ')}.`:'Tutte le scadenze sono impostate e in regola.',od.length||nd.length?{l:'Apri Veicoli',a:'gotoveic'}:null);
+  add('Scadenze',!od.length&&!nd.length,od.length?`Scadute per: ${od.join(', ')}. Se le hai pagate, premi “Segna come pagata”.`:nd.length?`Da inserire per: ${nd.join(', ')}.`:'Tutte le scadenze sono impostate e in regola.',od.length||nd.length?{l:'Apri Auto',a:'gotoauto'}:null);
   const np=ex.filter(e=>!e.pay).length;
   add('Modalità di pagamento',np===0,np?`${np} spese senza modalità di pagamento. Puoi assegnarla solo a quelle che ne sono prive.`:'Tutte le spese hanno la modalità di pagamento.',np?{l:'Assegna',a:'fixpay',sel:'pay'}:null);
   const nr=ex.filter(e=>e.people>1&&!e.rb&&!(e.rbamt>=0)).length;
@@ -1317,9 +1503,12 @@ function featCard(){
 }
 const needOnb=()=>!state.onb&&!(state.income>0)&&!(state.expenses&&state.expenses.length);
 function viewOb(){
-  const n=3,st=obs,v=x=>obd[x]!==undefined&&obd[x]!==''?String(obd[x]).replace('.',','):'';
+  const n=4,st=obs,v=x=>obd[x]!==undefined&&obd[x]!==''?String(obd[x]).replace('.',','):'';
+  const fx=obd.fix||{},fv2=k=>fx[k]>0?String(fx[k]).replace('.',','):'';
+  const items=FT.filter(f=>fx[f[0]]>0).map(f=>({t:f[0],name:f[1],amt:fx[f[0]]})),ft=rc(items.reduce((a,i)=>a+i.amt,0)),P=savePlan(obd.inc||0,ft);
   const T=[['Quanto entra ogni mese?','Stipendio o altre entrate regolari. Potrai cambiarlo quando vuoi.',`<label>Entrate mensili (€)<input id="obinc" inputmode="decimal" placeholder="es. 1500" value="${v('inc')}"></label>`],
-    ['Quanto vuoi mettere da parte?',obd.inc>0?`Un buon inizio è circa il 10%: ${eur0(obd.inc/10)} al mese. Il resto, tolte le spese fisse, diventa il tuo budget.`:'Il resto, tolte le spese fisse, diventa il tuo budget.',`<label>Obiettivo di risparmio al mese (€)<input id="obgoal" inputmode="decimal" placeholder="es. 150" value="${v('goal')}"></label>`],
+    ['Quali sono le tue spese fisse?','Quelle che paghi ogni mese, sempre uguali. Lascia vuoto ciò che non hai. Inserisci l’importo mensile: per pagamenti settimanali o annuali, poi, usa la scheda Ricorrenti.',FT.map(f=>`<label>${f[1]} (€ al mese)<input id="obf_${f[0]}" inputmode="decimal" placeholder="0" value="${fv2(f[0])}"></label>`).join('')],
+    ['Quanto puoi mettere da parte?','Prima abbiamo contato entrate e spese fisse: ecco la stima di quanto puoi risparmiare e da dove partire a limare.',`${planInner(obd.inc,items,0,true,false)}<label style="margin-top:14px">Obiettivo di risparmio al mese (€)<input id="obgoal" inputmode="decimal" placeholder="es. ${P.ideal||150}" value="${v('goal')!==''?v('goal'):(P.ideal>0?String(P.ideal):'')}"></label>`],
     ['Quanto hai sui conti adesso?','Facoltativo: serve a calcolare i saldi di carta, contanti e PayPal. Puoi saltare e farlo dopo.',`<label>Carta (€)<input id="obB" inputmode="decimal" placeholder="0,00" value="${v('B')}"></label><label>Contanti (€)<input id="obC" inputmode="decimal" placeholder="0,00" value="${v('C')}"></label><label>PayPal (€)<input id="obP" inputmode="decimal" placeholder="0,00" value="${v('P')}"></label>`]][st];
   return `<div class="progress"><span>Passo ${st+1} di ${n}</span><span>${st===0?'Benvenuto':''}</span></div><div class="bar" style="margin-bottom:12px"><i style="width:${Math.round((st+1)/n*100)}%"></i></div>
   <div class="obhead"><h1>${T[0]}</h1><p class="note" style="margin:0">${T[1]}</p></div>
@@ -1331,9 +1520,17 @@ function obStep(a){
   const g=id=>{const e=document.getElementById(id);return e?mon(e.value):NaN;},err=m=>{const e=document.getElementById('oberr');e.textContent=m;e.hidden=false;};
   if(a==='obback'){obs=Math.max(0,obs-1);render();return;}
   if(obs===0){const x=g('obinc');if(!(x>0))return err('Inserisci le entrate mensili.');obd.inc=x;obs=1;render();return;}
-  if(obs===1){const x=g('obgoal')||0;if(x<0||x>=obd.inc)return err('L’obiettivo deve essere minore delle entrate.');obd.goal=x;obs=2;render();return;}
+  if(obs===1){
+    const fx={};let tot=0;
+    for(const f of FT){const x=g('obf_'+f[0]);if(x<0)return err('Gli importi non possono essere negativi.');if(x>0){fx[f[0]]=x;tot+=x;}}
+    if(tot>=obd.inc)return err('Le spese fisse sono pari o superiori alle entrate: controlla gli importi.');
+    obd.fix=fx;obs=2;render();return;
+  }
+  if(obs===2){const x=g('obgoal')||0;if(x<0||x>=obd.inc)return err('L’obiettivo deve essere minore delle entrate.');obd.goal=x;obs=3;render();return;}
   const B=g('obB')||0,C=g('obC')||0,P=g('obP')||0;
   state.income=obd.inc;state.goal=obd.goal||0;
+  state.fixed=state.fixed||[];
+  FT.forEach((f,i)=>{const x=(obd.fix||{})[f[0]];if(x>0)state.fixed.push({id:Date.now()+i,c:f[2],name:f[1],amt:x,t:f[0]});});
   if(a==='obnext'&&(B||C||P))state.zero={date:dkey(new Date()),B,C,P};
   state.onb=1;state.feat={sfide:0,compra:0,check:0};
   obs=0;obd={};tab='oggi';save();render();window.scrollTo(0,0);
@@ -1398,7 +1595,7 @@ function drawTop(){
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menuOpen){menuOpen=false;drawTop();}});
 function render(){
-  const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Anno'],['auto','Mensili'],['conti','Conti']];
+  const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Anno'],['auto','Ricorrenti'],['conti','Conti']];
   const V={oggi:viewOggi,spese:viewSpese,anno:viewAnno,auto:viewMensili,conti:viewConti,sfide:viewSfide,compra:viewBuy,fumo:viewFumo,check:viewCheck,guida:viewGuida,impostazioni:viewImpostazioni};
   if(!['oggi','spese','anno','auto','conti'].includes(tab)&&!pageList().some(p=>p[0]===tab))tab='oggi';
   const v=(V[tab]||viewOggi)();
@@ -1407,7 +1604,7 @@ function render(){
   document.getElementById('tabbar').innerHTML=`<div class="in">${tabs.map(([k,n])=>`<button data-tab="${k}" ${tab===k?'aria-current="page"':''}><span class="ti">${IC[k==="auto"?"mensili":k]}</span><span>${n}</span></button>`).join('')}</div>`;
   app.innerHTML=(pg?`<h1 class="page">${pg[1]}</h1>`:'')+v+`<p class="note" id="saveStatus" role="status"></p>`;
   showStatus();
-  updQuota();
+  updQuota();updFpv();
   drawFab();
 }
 
@@ -1536,8 +1733,10 @@ document.addEventListener('click',e=>{
     const nm=document.getElementById('fname').value.trim(),am=mon(document.getElementById('famt').value);
     if(!nm||!(am>0)){const er=document.getElementById('ferr');er.textContent='Inserisci nome e importo mensile.';er.hidden=false;return;}
     state.fixed=state.fixed||[];
-    const f=fixEdit&&state.fixed.find(x=>x.id===fixEdit),v=Math.round(am*100)/100;
-    if(f){f.name=nm;f.amt=v;fixEdit=null;}else state.fixed.push({id:Date.now(),c:t.dataset.c,name:nm,amt:v,v:t.dataset.v?parseInt(t.dataset.v,10):undefined});
+    const f=fixEdit&&state.fixed.find(x=>x.id===fixEdit),fq=document.getElementById('ffr').value,raw=rc(am),v=toMonth(am,fq);
+    if(!(v>0)){const er=document.getElementById('ferr');er.textContent='L’importo è troppo piccolo.';er.hidden=false;return;}
+    const ts=document.getElementById('ftype'),tp=ts?ts.value:undefined;
+    if(f){f.name=nm;f.amt=v;f.raw=raw;f.fr=fq;if(tp)f.t=tp;fixEdit=null;}else state.fixed.push({id:Date.now(),c:t.dataset.c,name:nm,amt:v,raw,fr:fq,v:t.dataset.v?parseInt(t.dataset.v,10):undefined,t:tp});
     save();render();
   }else if(a==='fedit'){fixEdit=parseInt(t.dataset.id,10);render();
   }else if(a==='fdel'){const id=t.dataset.id;softDelete('Voce eliminata',()=>{state.fixed=(state.fixed||[]).filter(x=>String(x.id)!==id);if(String(fixEdit)===id)fixEdit=null;});
@@ -1556,6 +1755,7 @@ document.addEventListener('click',e=>{
   }else if(a==='radd'){
     const nm=document.getElementById('rname').value.trim(),km=num(document.getElementById('rkm').value);
     const dy=parseInt(document.getElementById('rdays').value,10),rt=document.getElementById('rrt').checked,rv=parseInt(document.getElementById('rveh').value,10);
+    if(!vehReady(vById(rv))){const er=document.getElementById('rerr');er.textContent='Scegli un veicolo con consumo e prezzo del carburante impostati.';er.hidden=false;return;}
     if(!nm||!(km>0)||!(dy>=1&&dy<=7)){const er=document.getElementById('rerr');er.textContent='Inserisci nome, km di andata e giorni a settimana (da 1 a 7).';er.hidden=false;return;}
     state.routes=state.routes||[];
     const r=routeEdit&&state.routes.find(x=>x.id===routeEdit);
@@ -1575,6 +1775,10 @@ document.addEventListener('click',e=>{
   }else if(a==='nowY'){ay=new Date().getFullYear();render();
   }else if(a==='gotoM'){
     vy=ay;vm=parseInt(t.dataset.m,10);sel=null;editId=null;tab='oggi';render();window.scrollTo(0,0);
+  }else if(a==='imppick'){const el=document.getElementById('impfile');if(el){el.value='';el.click();}
+  }else if(a==='impmodel'){dl('modello-import-spese.csv','\uFEFFData;Importo;Categoria;Nota;Pagato con\n01/11/2026;12,50;Spesa;Pane e latte;Carta\n02/11/2026;8,00;Uscite e svago;Caffè;Contanti\n');
+  }else if(a==='impgo'){impGo();
+  }else if(a==='impcancel'){imp=null;render();
   }else if(a==='expEvents'){exportEvents();
   }else if(a==='expAll'){exportAll();
   }else if(a==='switchUser'){switchUser();
@@ -1603,10 +1807,16 @@ document.addEventListener('click',e=>{
   }else if(a==='wzr'){wz=0;render();
   }else if(a==='qa'){quickAdd();
   }else if(a==='spp'){spP=t.dataset.v;render();
+  }else if(a==='adm'){aMode=t.dataset.v;render();
+  }else if(a==='apm'||a==='anm'){const n0=new Date(),cur=aMon!==null?aMon:(ay===n0.getFullYear()?n0.getMonth():0);aMon=(cur+(a==='anm'?1:11))%12;render();
+  }else if(a==='catyear'){tab='spese';spP=aMode==='m'?'m':'y';vy=ay;if(aMode==='m')vm=(aMon!==null?aMon:(ay===new Date().getFullYear()?new Date().getMonth():0));catFilter=t.dataset.c;render();window.scrollTo(0,0);
   }else if(a==='spy'){tab='spese';spP='y';vy=ay;render();window.scrollTo(0,0);
   }else if(a==='obnext'||a==='obback'||a==='obskip'){obStep(a);
+  }else if(a==='obpreset'){const el=document.getElementById('obgoal')||document.getElementById('goal');if(el)el.value=t.dataset.v;
+  }else if(a==='gofix'){tab='auto';msub='fix';render();window.scrollTo(0,0);
   }else if(a==='gotoimp'){tab='impostazioni';render();window.scrollTo(0,0);
-  }else if(a==='gotoveic'){tab='auto';msub='auto';render();window.scrollTo(0,0);
+  }else if(a==='gotoveic'){tab='impostazioni';render();const ve=document.getElementById('veh');if(ve)ve.scrollIntoView();else window.scrollTo(0,0);
+  }else if(a==='gotoauto'){tab='auto';msub='auto';render();window.scrollTo(0,0);
   }else if(a==='gotoconti'){tab='conti';render();window.scrollTo(0,0);
   }else if(a==='fixpay'){const v=document.getElementById('wzsel').value;state.expenses.forEach(e=>{if(!e.pay)e.pay=v;});save();render();
   }else if(a==='fixnat'){const v=document.getElementById('wzsel').value;[...(state.entries||[]),...(state.pp||[])].forEach(x=>{if(x.amt>0&&!x.k)x.k=v;});save();render();
@@ -1628,9 +1838,11 @@ app.addEventListener('input',e=>{
   const id=e.target.id,pair={cons:'cl100',cl100:'cons',ccons:'ccl100',ccl100:'ccons',vcons:'vcl100',vcl100:'vcons'}[id];
   if(pair){const v=num(e.target.value);document.getElementById(pair).value=v>0?String(Math.round(100/v*100)/100).replace('.',','):'';}
   if(['amt','ppl','km','cons','cl100','price','rbamt'].includes(id)||/^fa\d+$/.test(id))updQuota();
-  if(['ekm','vcons','vcl100','vprice'].includes(id))updEst();
+  if(id==='famt')updFpv();
 });
 app.addEventListener('change',e=>{
+  if(e.target.id==='ffr'){updFpv();return;}
+  if(e.target.id==='impfile'){impLoad(e.target.files&&e.target.files[0]);return;}
   if(e.target.dataset&&e.target.dataset.feat){state.feat=Object.assign({sfide:1,compra:1,check:1},state.feat||{});state.feat[e.target.dataset.feat]=e.target.checked?1:0;save();render();return;}
   if(e.target.id==='smon'){state.smoke=state.smoke||{};state.smoke.on=e.target.checked;save();render();return;}
   if(e.target.dataset.ch){const k=e.target.dataset.ch;state.ch=state.ch||{};if(e.target.checked)state.ch[k]={e:parseFloat(e.target.dataset.e)||0,d:e.target.dataset.d};else delete state.ch[k];save();render();return;}
