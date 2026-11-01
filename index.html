@@ -634,6 +634,13 @@ function setupCard(title,part){
   <button class="btn" data-act="${G?'saveGoal':'saveSetup'}">Salva</button></div>`;
 }
 
+function goalRow(){
+  const P=state.income>0?savePlan(state.income,fixedTot()):null;
+  const m=msg?`<div class="msg" role="alert">${esc(msg)}</div>`:'';
+  const chips=P&&P.ideal>0?`<div class="chips" style="margin:8px 0 10px">${[['Prudente',P.low],['Consigliato',P.ideal],['Ambizioso',P.high]].map(([l,v])=>`<button type="button" class="chip" data-act="obpreset" data-v="${v}" style="padding:4px 14px">${l} ${eur0(v)}</button>`).join('')}</div>`:'';
+  return `<div class="card">${m}<label>Obiettivo di risparmio al mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>${chips}<button class="btn" data-act="saveGoal">Salva</button></div>`;
+}
+
 function monthNav(c){
   return `<div class="mnav"><button class="nbtn" data-act="prevM" aria-label="Mese precedente">${IC.l}</button><strong>${mlabel(c.y,c.m)}</strong><button class="nbtn" data-act="nextM" aria-label="Mese successivo">${IC.r}</button></div>`+
   (c.isCur?'':`<div style="margin:-6px 0 12px;text-align:center"><button class="link" data-act="nowM">Torna a oggi</button></div>`);
@@ -1254,7 +1261,6 @@ function entrateCard(){
   <button class="btn" data-act="recadd">Aggiungi entrata</button></div>`;
   return head+prev+recs+manual+add;
 }
-const goalCard=()=>setupCard('Spese fisse e obiettivo','goal');
 function applyRec(silent){
   const n=new Date(),cm=n.getFullYear()*12+n.getMonth();let ch=false;
   (state.rec||[]).forEach(r=>{
@@ -1371,7 +1377,7 @@ function impCard(){
   <div class="row" style="margin-top:12px"><button class="btn sec" data-act="impcancel">Annulla</button>${r.ok.length?`<button class="btn" data-act="impgo">Importa ${r.ok.length}</button>`:'<button class="btn" data-act="imppick">Scegli un altro file</button>'}</div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" style="display:none"></div>`;
 }
 function viewImpostazioni(){
-  return `${goalCard()}${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
+  return `${goalRow()}${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
   <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
@@ -1387,7 +1393,7 @@ function viewGuida(){
   s('Andamento',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
   s('Ricorrenti',['In alto scegli Uscite o Entrate. In Entrate imposti lo stipendio previsto e le entrate fisse automatiche (stipendio e altre entrate), che vengono registrate da sole ogni mese.','In Uscite metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), spese fisse, stima del risparmio e obiettivo, punto zero dei conti, backup e dati. Le entrate previste e quelle fisse automatiche sono in Ricorrenti, scheda Entrate.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), obiettivo di risparmio, punto zero dei conti, backup e dati. Le entrate previste e quelle fisse automatiche sono in Ricorrenti, scheda Entrate.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
