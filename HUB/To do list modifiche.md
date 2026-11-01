@@ -22,7 +22,7 @@ L'utente deve poter inserire più tipologie di spese ricorrenti, specificando pe
 
 ---
 
-## 2. Inserimento modifiche suggerite da Nicolò
+## 2. Inserimento modifiche fatte da Nicolò
 
 Ricordarsi di integrare nella versione attuale dell'applicazione anche le modifiche apportate da Nicolò nella sua versione.
 
