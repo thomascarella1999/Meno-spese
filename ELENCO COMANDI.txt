@@ -1,0 +1,9 @@
+
+
+git pull :ottenere aggiornamento delle modifiche remote
+
+
+git clone :scarica la cartelle di GitHub in locale
+git add . :registra tutte le modifiche fatte in locale
+git commit - "commento" :aggiunge un commento alle modifiche fatte
+git push origin main :manda i file o modifiche su GitHub
