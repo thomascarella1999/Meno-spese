@@ -614,18 +614,24 @@ function calc(){
 }
 
 /* ---------- componenti ---------- */
-function setupCard(title){
+function setupCard(title,part){
   const b=budgetOf(),ft=fixedTot();
+  const m=msg?`<div class="msg" role="alert">${esc(msg)}</div>`:'';
+  if(part==='inc')return `<div class="card"><h2>${title}</h2>
+  ${m}
+  <label>Entrate mensili previste (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
+  <button class="btn" data-act="saveInc">Salva</button></div>`;
+  const G=part==='goal';
   return `<div class="card"><h2>${title}</h2>
-  ${msg?`<div class="msg" role="alert">${esc(msg)}</div>`:''}
-  <label>1. Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
-  <h3 style="margin:14px 0 6px">2. Spese fisse: ${eur0(ft)} al mese</h3>
+  ${m}
+  ${G?'':`<label>1. Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>`}
+  <h3 style="margin:14px 0 6px">${G?'1':'2'}. Spese fisse: ${eur0(ft)} al mese</h3>
   <p class="note" style="margin:0 0 8px">Inseriscile prima dell’obiettivo: affitto, bollette, abbonamenti, rate. L’app stima poi quanto puoi risparmiare.</p>
   <button type="button" class="btn sec" data-act="gofix">${ft>0?'Modifica le spese fisse':'Inserisci le spese fisse'}</button>
   <h3 style="margin:16px 0 6px">Stima del risparmio</h3>${planInner(state.income,fixItems(),state.goal,true,false,false)}
-  <label style="margin-top:14px">3. Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
+  <label style="margin-top:14px">${G?'2':'3'}. Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
   ${b>0?`<p class="note">Budget per le spese: <strong>${eur0(b)}</strong> al mese.</p>`:''}
-  <button class="btn" data-act="saveSetup">Salva</button></div>`;
+  <button class="btn" data-act="${G?'saveGoal':'saveSetup'}">Salva</button></div>`;
 }
 
 function monthNav(c){
@@ -1236,11 +1242,11 @@ function recCard(){
   <button class="btn" data-act="recadd">Aggiungi entrata fissa</button></div>`;
 }
 function entrateCard(){
-  const a=setupCard('Entrate e obiettivo'),r=recCard();
-  const head=a.slice(0,a.lastIndexOf('</div>'));
+  const a=setupCard('Entrate mensili','inc'),r=recCard();
   const inner=r.replace('<div class="card"><h2>Entrate fisse</h2>','<h3 style="margin-top:18px">Entrate fisse automatiche</h3>');
-  return head+'<p class="note">Le entrate qui sono previsioni. Quando registri entrate vere nei Conti, per quel mese lo stipendio sostituisce la previsione e le altre entrate si sommano.</p>'+inner;
+  return a+'<p class="note">Le entrate qui sono previsioni. Quando registri entrate vere nei Conti, per quel mese lo stipendio sostituisce la previsione e le altre entrate si sommano.</p>'+inner;
 }
+const goalCard=()=>setupCard('Spese fisse e obiettivo','goal');
 function applyRec(silent){
   const n=new Date(),cm=n.getFullYear()*12+n.getMonth();let ch=false;
   (state.rec||[]).forEach(r=>{
@@ -1357,7 +1363,7 @@ function impCard(){
   <div class="row" style="margin-top:12px"><button class="btn sec" data-act="impcancel">Annulla</button>${r.ok.length?`<button class="btn" data-act="impgo">Importa ${r.ok.length}</button>`:'<button class="btn" data-act="imppick">Scegli un altro file</button>'}</div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" style="display:none"></div>`;
 }
 function viewImpostazioni(){
-  return `${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
+  return `${goalCard()}${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
   <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
@@ -1371,9 +1377,9 @@ function viewGuida(){
   s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto mostra quanto hai speso nella settimana (lunedì–domenica) e nel mese rispetto al relativo budget.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
   s('Andamento',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
-  s('Ricorrenti',['In alto scegli Uscite o Entrate. In Entrate imposti lo stipendio previsto, l’obiettivo di risparmio e le entrate fisse automatiche (stipendio e altre entrate), che vengono registrate da sole ogni mese.','In Uscite metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
+  s('Ricorrenti',['In alto scegli Uscite o Entrate. In Entrate imposti lo stipendio previsto e le entrate fisse automatiche (stipendio e altre entrate), che vengono registrate da sole ogni mese.','In Uscite metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), punto zero dei conti, backup e dati. Le entrate previste, l’obiettivo e le entrate fisse automatiche sono in Ricorrenti, scheda Entrate.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), spese fisse, stima del risparmio e obiettivo, punto zero dei conti, backup e dati. Le entrate previste e quelle fisse automatiche sono in Ricorrenti, scheda Entrate.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
@@ -1623,7 +1629,19 @@ document.addEventListener('click',e=>{
   if(t.dataset.tab){menuOpen=false;tab=t.dataset.tab;catFilter=null;if(tab==='check')wz=0;if(tab==='compra')bv=null;track('tab_view',tab);render();window.scrollTo(0,0);return;}
   const a=t.dataset.act;
   if(a==='menu'){menuOpen=!menuOpen;drawTop();return;}
-  if(a==='saveSetup'){
+  if(a==='saveInc'){
+    const inc=mon(document.getElementById('inc').value);
+    if(!(inc>0))msg='Inserisci le entrate mensili.';
+    else if(state.goal>=inc)msg='L’obiettivo di risparmio ('+eur0(state.goal)+') deve essere minore delle entrate: abbassalo in Impostazioni.';
+    else{state.income=inc;save();}
+    render();
+  }else if(a==='saveGoal'){
+    const goal=mon(document.getElementById('goal').value)||0;
+    if(!(state.income>0))msg='Prima inserisci le entrate mensili in Ricorrenti, scheda Entrate.';
+    else if(goal<0||goal>=state.income)msg='L’obiettivo deve essere minore delle entrate.';
+    else{state.goal=goal;save();}
+    render();
+  }else if(a==='saveSetup'){
     const inc=mon(document.getElementById('inc').value),goal=mon(document.getElementById('goal').value)||0;
     if(!(inc>0))msg='Inserisci le entrate mensili.';
     else if(goal<0||goal>=inc)msg='L’obiettivo deve essere minore delle entrate.';
