@@ -298,7 +298,7 @@ const PAYS=['Contanti','PayPal','Carta'];
 const CATS=['Casa','Spesa','Trasporti','Uscite e svago','Abbonamenti','Salute','Altro'];
 const MI=['G','F','M','A','M','G','L','A','S','O','N','D'];
 let state={income:0,goal:0,expenses:[],plan:{}};
-let aMode='y',aMon=null,spP='m',tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
+let aMode='y',aMon=null,spP='m',tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',rdir='u',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
 const app=document.getElementById('app');
 
 /* ---------- icone (SVG, stesso stile: tratto 2px, angoli arrotondati) ---------- */
@@ -950,7 +950,7 @@ function viewAnno(){
   const budget=budgetOf();
   const nav=`<div class="mnav"><button class="nbtn" data-act="prevY" aria-label="Anno precedente">${IC.l}</button><strong>${ay}</strong><button class="nbtn" data-act="nextY" aria-label="Anno successivo">${IC.r}</button></div>`+
     (ay===ny?'':`<div style="margin:-6px 0 12px;text-align:center"><button class="link" data-act="nowY">Anno in corso</button></div>`);
-  if(budget<=0)return nav+`<p class="note">Imposta entrate e obiettivo per vedere il riepilogo annuale.</p><button class="btn" data-act="gotoimp">Apri Impostazioni</button>`;
+  if(budget<=0)return nav+`<p class="note">Imposta entrate e obiettivo per vedere il riepilogo annuale.</p><button class="btn" data-act="gotoentr">Imposta le entrate</button>`;
   const yexp=state.expenses.filter(e=>e.date.startsWith(ay+'-'));
   const months=Array(12).fill(0);
   yexp.forEach(e=>{months[parseInt(e.date.slice(5,7),10)-1]+=e.amount;});
@@ -1207,12 +1207,14 @@ function viewTragitti(){
 }
 
 function viewMensili(){
+  const dsw=`<nav class="seg" aria-label="Tipo di ricorrenza">${[['u','Uscite'],['e','Entrate']].map(([v,l])=>`<button data-act="rd" data-v="${v}" ${rdir===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
+  if(rdir==='e')return dsw+entrateCard();
   const ft=fixedTot(),b=Math.max(0,incOf(dkey(new Date()).slice(0,7))-state.goal);
   const sw=`<nav class="seg">${[['fix','Casa'],['auto','Auto'],['tr','Tragitti'],['abb','Abbonamenti']].map(([v,l])=>`<button data-act="ms" data-v="${v}" ${msub===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
   const fl=[...(state.fixed||[])].sort((x,y)=>y.amt-x.amt),rtc=state.noRoutes?0:routesTot();
   const fr=fl.map(f=>`<div class="exp"><div class="what">${esc(f.name)}<small>${esc(f.c==='Auto'?'Auto':f.c)} · ${frOf(f)==='m'?'ogni mese':eur2(rawOf(f))+' '+frLbl(frOf(f))}</small></div><span class="amt">${eur2(f.amt)}</span></div>`).join('')+(rtc>0?`<div class="exp"><div class="what">Carburante dei tragitti<small>Tragitti · ogni mese</small></div><span class="amt">${eur2(rtc)}</span></div>`:'');
   const head=(ft>0||b>0)?`<div class="card"><p style="margin:0 0 ${ft>0?8:0}px">Spese fisse: <strong>${eur0(ft)}</strong> al mese${ft>0?', tutte le ricorrenze impostate:':'.'}</p>${fr}${b>0?`<p class="note" style="margin:8px 0 0">Il budget per le altre spese scende a <strong>${eur0(Math.max(0,b-ft))}</strong> e abbassa il limite giornaliero.</p>`:''}</div>`:'';
-  return sw+head+(msub==='auto'?viewAutoTab():msub==='tr'?viewTragitti():msub==='fix'?fixedCard('Casa'):fixedCard('Abbonamenti'));
+  return dsw+sw+head+(msub==='auto'?viewAutoTab():msub==='tr'?viewTragitti():msub==='fix'?fixedCard('Casa'):fixedCard('Abbonamenti'));
 }
 
 function zeroCard(){
@@ -1355,7 +1357,7 @@ function impCard(){
   <div class="row" style="margin-top:12px"><button class="btn sec" data-act="impcancel">Annulla</button>${r.ok.length?`<button class="btn" data-act="impgo">Importa ${r.ok.length}</button>`:'<button class="btn" data-act="imppick">Scegli un altro file</button>'}</div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" style="display:none"></div>`;
 }
 function viewImpostazioni(){
-  return `${entrateCard()}${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
+  return `${viewVeicoliSetup()}${zeroCard()}${featCard()}${impCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
   <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
@@ -1365,13 +1367,13 @@ function viewImpostazioni(){
 function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
-  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Ricorrenti, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
+  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Andamento, Ricorrenti, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
   s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto mostra quanto hai speso nella settimana (lunedì–domenica) e nel mese rispetto al relativo budget.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
-  s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
-  s('Ricorrenti',['Qui metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
+  s('Andamento',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
+  s('Ricorrenti',['In alto scegli Uscite o Entrate. In Entrate imposti lo stipendio previsto, l’obiettivo di risparmio e le entrate fisse automatiche (stipendio e altre entrate), che vengono registrate da sole ogni mese.','In Uscite metti i pagamenti che si ripetono. Per ogni voce scegli la ricorrenza (ogni giorno, settimana, mese o anno): l’app la converte in un importo mensile per il budget.','Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Auto: spese fisse del veicolo, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Per crearli serve prima un veicolo con consumo e prezzo del carburante, da impostare in Impostazioni. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, stima del risparmio e obiettivo (dopo le spese fisse), punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: veicoli (consumo e prezzo del carburante), funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), punto zero dei conti, backup e dati. Le entrate previste, l’obiettivo e le entrate fisse automatiche sono in Ricorrenti, scheda Entrate.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
@@ -1462,7 +1464,7 @@ function viewFumo(){
 let wz=0;
 function checks(){
   const S=[],td=dkey(new Date()),ex=state.expenses,V=vehs(),add=(t,ok,msg,fix)=>S.push({t,ok,msg,fix});
-  add('Entrate e obiettivo',state.income>0&&state.goal>=0&&state.goal<state.income,state.income>0&&state.goal<state.income?'Entrate mensili e obiettivo di risparmio impostati.':'Mancano le entrate mensili previste, oppure l’obiettivo è troppo alto.',{l:'Apri Impostazioni',a:'gotoimp'});
+  add('Entrate e obiettivo',state.income>0&&state.goal>=0&&state.goal<state.income,state.income>0&&state.goal<state.income?'Entrate mensili e obiettivo di risparmio impostati.':'Mancano le entrate mensili previste, oppure l’obiettivo è troppo alto.',{l:'Imposta le entrate',a:'gotoentr'});
   add('Spese fisse',fixedTot()>0,fixedTot()>0?`Spese fisse inserite: ${eur0(fixedTot())} al mese.`:'Non hai inserito spese fisse: senza, la stima del risparmio e il budget sono troppo ottimistici.',fixedTot()>0?null:{l:'Inserisci le spese fisse',a:'gofix'});
   add('Punto zero',!!state.zero,state.zero?`Punto zero al ${dfmt(state.zero.date)}.`:'Nessun punto zero: i saldi dei conti partono da zero.',{l:'Imposta il punto zero',a:'gotoimp'});
   const v0=vById(state.mainVeh),vo=v0.cons>0&&v0.price>0;
@@ -1595,7 +1597,7 @@ function drawTop(){
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menuOpen){menuOpen=false;drawTop();}});
 function render(){
-  const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Anno'],['auto','Ricorrenti'],['conti','Conti']];
+  const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Andamento'],['auto','Ricorrenti'],['conti','Conti']];
   const V={oggi:viewOggi,spese:viewSpese,anno:viewAnno,auto:viewMensili,conti:viewConti,sfide:viewSfide,compra:viewBuy,fumo:viewFumo,check:viewCheck,guida:viewGuida,impostazioni:viewImpostazioni};
   if(!['oggi','spese','anno','auto','conti'].includes(tab)&&!pageList().some(p=>p[0]===tab))tab='oggi';
   const v=(V[tab]||viewOggi)();
@@ -1728,6 +1730,7 @@ document.addEventListener('click',e=>{
     v.cons=num(document.getElementById('vcons').value)||0;v.price=num(document.getElementById('vprice').value)||0;save();render();
   }else if(a==='catf'){catFilter=t.dataset.c;render();window.scrollTo(0,0);
   }else if(a==='catback'){catFilter=null;render();
+  }else if(a==='rd'){rdir=t.dataset.v;track('tab_view','ricorrenti/'+(rdir==='e'?'entrate':'uscite'));render();
   }else if(a==='ms'){msub=t.dataset.v;fixEdit=null;track('tab_view','mensili/'+msub);render();
   }else if(a==='fadd'){
     const nm=document.getElementById('fname').value.trim(),am=mon(document.getElementById('famt').value);
@@ -1813,10 +1816,11 @@ document.addEventListener('click',e=>{
   }else if(a==='spy'){tab='spese';spP='y';vy=ay;render();window.scrollTo(0,0);
   }else if(a==='obnext'||a==='obback'||a==='obskip'){obStep(a);
   }else if(a==='obpreset'){const el=document.getElementById('obgoal')||document.getElementById('goal');if(el)el.value=t.dataset.v;
-  }else if(a==='gofix'){tab='auto';msub='fix';render();window.scrollTo(0,0);
+  }else if(a==='gofix'){tab='auto';rdir='u';msub='fix';render();window.scrollTo(0,0);
   }else if(a==='gotoimp'){tab='impostazioni';render();window.scrollTo(0,0);
+  }else if(a==='gotoentr'){tab='auto';rdir='e';render();window.scrollTo(0,0);
   }else if(a==='gotoveic'){tab='impostazioni';render();const ve=document.getElementById('veh');if(ve)ve.scrollIntoView();else window.scrollTo(0,0);
-  }else if(a==='gotoauto'){tab='auto';msub='auto';render();window.scrollTo(0,0);
+  }else if(a==='gotoauto'){tab='auto';rdir='u';msub='auto';render();window.scrollTo(0,0);
   }else if(a==='gotoconti'){tab='conti';render();window.scrollTo(0,0);
   }else if(a==='fixpay'){const v=document.getElementById('wzsel').value;state.expenses.forEach(e=>{if(!e.pay)e.pay=v;});save();render();
   }else if(a==='fixnat'){const v=document.getElementById('wzsel').value;[...(state.entries||[]),...(state.pp||[])].forEach(x=>{if(x.amt>0&&!x.k)x.k=v;});save();render();
