@@ -434,7 +434,7 @@ list('paypal_moves.csv','paypal_move','pp',{date:'S',desc:'S',amt:'n',k:'s',rid:
 list('recurring.csv','recurring','rec',{name:'S',amt:'n',day:'n',led:'S',kind:'S',from:'S'},c=>c.kind);
 list('wishlist.csv','wish','wish',{name:'S',price:'n',st:'S',until:'S',d:'S'},c=>c.st);
 list('cigarettes.csv','cigarette','cig',{date:'S',time:'S',mom:'S'},()=>'');
-const SET=['income','goal','lastPay','car','mainVeh','ppReal','realB','realC','zero','noRoutes','smoke','ver','feat','onb','lastCat'],QUIET=['lastPay','car','ver','lastCat'];
+const SET=['income','incName','goal','lastPay','car','mainVeh','ppReal','realB','realC','zero','noRoutes','smoke','ver','feat','onb','lastCat'],QUIET=['lastPay','car','ver','lastCat'];
 /* Importi: in memoria euro (sempre multipli di 0,01), nell'archivio centesimi interi (ver 2). */
 const MON={expenses:['amount','total','rbamt'],fixed:['amt','raw'],entries:['amt'],pp:['amt'],rec:['amt'],wish:['price']},MSET=['income','goal','ppReal','realB','realC'];
 const cv=(f,x)=>typeof x==='number'&&isFinite(x)?f(x):x;
@@ -1232,19 +1232,27 @@ function zeroCard(){
   ${f('zB','Saldo Carta')}${f('zC','Saldo Contanti')}${f('zP','Saldo PayPal')}
   <button class="btn" data-act="saveZero">Salva punto zero</button></div>`;
 }
-function recCard(){
-  const rows=(state.rec||[]).map(r=>`<div class="exp"><div class="what">${esc(r.name)}<small>${eur2(r.amt)} il giorno ${r.day}, ${LG[r.led]}</small></div><button class="link" data-act="recdel" data-id="${r.id}">Elimina</button></div>`).join('');
-  return `<div class="card"><h2>Entrate fisse</h2><p class="note" style="margin-top:0">Vengono registrate da sole ogni mese, dal mese in cui le aggiungi. Puoi correggere o eliminare ogni singola entrata nei Conti.</p>${rows}
+function entrateCard(){
+  const mk=dkey(new Date()).slice(0,7),td=new Date().getDate();
+  const L=[...(state.entries||[]),...(state.pp||[])].filter(x=>x.k&&x.amt>0&&x.date.startsWith(mk));
+  const hasS=L.some(x=>x.k==='S'),tot=incOf(mk);
+  const m=msg?`<div class="msg" role="alert">${esc(msg)}</div>`:'';
+  const fv2=n=>String(n).replace('.',',');
+  const head=`<div class="card"><h2>Entrate di questo mese</h2><p style="margin:0;font-size:1.6em;font-weight:700;color:var(--ok)">${eur2(tot)}</p><p class="note" style="margin:6px 0 0">Il totale è la somma delle card qui sotto. Lo stipendio sostituisce la card “${esc(state.incName||'Entrate previste')}”, le altre entrate si sommano.</p></div>${m}`;
+  const prev=`<div class="card"><label>Nome<input id="pin" maxlength="30" value="${esc(state.incName||'Entrate previste')}"></label><label>Importo mensile (€)<input id="pia" inputmode="decimal" placeholder="es. 1500" value="${state.income?fv2(state.income):''}"></label>${hasS?'<p class="note" style="margin:0 0 8px">Al momento non conta: c’è uno stipendio registrato in questo mese.</p>':''}<button class="btn" data-act="incsave">Salva</button></div>`;
+  const recs=[...(state.rec||[])].sort((x,y)=>y.amt-x.amt).map(r=>{
+    const done=L.some(x=>String(x.rid)===String(r.id));
+    return `<div class="card"><label>Nome<input id="rn_${r.id}" maxlength="30" value="${esc(r.name)}"></label><label>Importo (€)<input id="ra_${r.id}" inputmode="decimal" value="${fv2(r.amt)}"></label><p class="note" style="margin:0 0 8px">${r.kind==='S'?'Stipendio':'Altra entrata'} · ogni mese il giorno ${r.day} · ${LG[r.led]}${done?'':' · in arrivo, non ancora contata'}</p><div class="row"><button class="btn" data-act="recsave" data-id="${r.id}">Salva</button><button class="btn sec" data-act="recdel" data-id="${r.id}">Elimina</button></div></div>`;
+  }).join('');
+  const man=L.filter(x=>!x.rid||!(state.rec||[]).some(r=>String(r.id)===String(x.rid)));
+  const manual=man.length?`<div class="card"><h2>Registrate nei Conti</h2>${man.map(x=>`<div class="exp"><div class="what">${esc(x.desc||'Entrata')}<small>${x.k==='S'?'Stipendio':'Altra entrata'} · ${dfmt(x.date)}</small></div><span class="amt" style="color:var(--ok)">+${eur2(x.amt)}</span></div>`).join('')}</div>`:'';
+  const add=`<div class="card"><h2>Aggiungi entrata</h2><p class="note" style="margin-top:0">Crea una nuova card. Si ripete da sola ogni mese, dal giorno che scegli.</p>
   <div class="msg" id="rcerr" role="alert" hidden></div>
   <label>Nome<input id="rcn" maxlength="30" placeholder="Stipendio"></label>
-  <div class="row"><label>Importo (€)<input id="rca" inputmode="decimal"></label><label>Giorno del mese<input id="rcd" inputmode="numeric" placeholder="27"></label></div>
-  <div class="row"><label>Conto<select id="rcl"><option value="B">Carta</option><option value="C">Contanti</option><option value="P">PayPal</option></select></label><label>Natura<select id="rck"><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label></div>
-  <button class="btn" data-act="recadd">Aggiungi entrata fissa</button></div>`;
-}
-function entrateCard(){
-  const a=setupCard('Entrate mensili','inc'),r=recCard();
-  const inner=r.replace('<div class="card"><h2>Entrate fisse</h2>','<h3 style="margin-top:18px">Entrate fisse automatiche</h3>');
-  return a+'<p class="note">Le entrate qui sono previsioni. Quando registri entrate vere nei Conti, per quel mese lo stipendio sostituisce la previsione e le altre entrate si sommano.</p>'+inner;
+  <div class="row"><label>Importo (€)<input id="rca" inputmode="decimal"></label><label>Giorno del mese<input id="rcd" inputmode="numeric" placeholder="27" value="${td}"></label></div>
+  <div class="row"><label>Conto<select id="rcl"><option value="B">Carta</option><option value="C">Contanti</option><option value="P">PayPal</option></select></label><label>Tipo<select id="rck"><option value="S">Stipendio</option><option value="A" selected>Altra entrata</option></select></label></div>
+  <button class="btn" data-act="recadd">Aggiungi entrata</button></div>`;
+  return head+prev+recs+manual+add;
 }
 const goalCard=()=>setupCard('Spese fisse e obiettivo','goal');
 function applyRec(silent){
@@ -1847,12 +1855,25 @@ document.addEventListener('click',e=>{
     if(!d){const er=document.getElementById('zerr');er.textContent='Scegli la data di partenza.';er.hidden=false;return;}
     state.zero={date:d,B:mon(document.getElementById('zB').value)||0,C:mon(document.getElementById('zC').value)||0,P:mon(document.getElementById('zP').value)||0};
     save();render();
+  }else if(a==='incsave'){
+    const nm=document.getElementById('pin').value.trim()||'Entrate previste',am=mon(document.getElementById('pia').value);
+    if(!(am>0))msg='Inserisci un importo maggiore di zero.';
+    else if(state.goal>=am)msg='L’obiettivo di risparmio ('+eur0(state.goal)+') deve essere minore delle entrate: abbassalo in Impostazioni.';
+    else{state.income=am;state.incName=nm;save();}
+    render();
+  }else if(a==='recsave'){
+    const id=t.dataset.id,r=(state.rec||[]).find(x=>String(x.id)===id);
+    const nm=document.getElementById('rn_'+id).value.trim(),am=mon(document.getElementById('ra_'+id).value);
+    if(!r)return;
+    if(!nm||!(am>0))msg='Inserisci nome e un importo maggiore di zero.';
+    else{const v=Math.round(am*100)/100,mk=dkey(new Date()).slice(0,7);r.name=nm;r.amt=v;[...(state.entries||[]),...(state.pp||[])].forEach(x=>{if(String(x.rid)===id&&x.date.startsWith(mk)){x.desc=nm;x.amt=v;}});save();}
+    render();
   }else if(a==='recadd'){
     const nm=document.getElementById('rcn').value.trim(),am=mon(document.getElementById('rca').value),dy=parseInt(document.getElementById('rcd').value,10);
     if(!nm||!(am>0)||!(dy>=1&&dy<=31)){const er=document.getElementById('rcerr');er.textContent='Inserisci nome, importo e giorno del mese (da 1 a 31).';er.hidden=false;return;}
     (state.rec=state.rec||[]).push({id:Date.now(),name:nm,amt:Math.round(am*100)/100,day:dy,led:document.getElementById('rcl').value,kind:document.getElementById('rck').value,from:dkey(new Date()).slice(0,7)});
     applyRec();save();render();
-  }else if(a==='recdel'){const id=t.dataset.id;softDelete('Entrata fissa eliminata',()=>{state.rec=(state.rec||[]).filter(x=>String(x.id)!==id);});
+  }else if(a==='recdel'){const id=t.dataset.id;softDelete('Entrata eliminata',()=>{const mk=dkey(new Date()).slice(0,7),keep=x=>!(String(x.rid)===id&&x.date.startsWith(mk));state.rec=(state.rec||[]).filter(x=>String(x.id)!==id);state.entries=(state.entries||[]).filter(keep);state.pp=(state.pp||[]).filter(keep);});
 
   }
 });
