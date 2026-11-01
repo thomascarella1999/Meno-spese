@@ -1142,7 +1142,7 @@ function viewImpostazioni(){
   return `${entrateCard()}${zeroCard()}${featCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
-  <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
+  <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
 }
 
 /* ---------- guida ---------- */
@@ -1679,6 +1679,14 @@ function migrateV2(){/* arrotonda ai centesimi eventuali dati vecchi e li salva 
   state=Object.assign({income:0,goal:0,expenses:[],plan:{}},state);
   state=DB.norm(state);save(true);
 }
+let persisted=null;
+async function keepStorage(){
+  try{
+    if(!navigator.storage||!navigator.storage.persist)return;
+    persisted=(await navigator.storage.persisted())||(await navigator.storage.persist());
+  }catch(e){persisted=null;}
+  if(tab==='impostazioni')render();
+}
 async function boot(){
   try{
     const r=await api('/api/load');
@@ -1686,7 +1694,7 @@ async function boot(){
     const before=JSON.stringify(state);vehs();migrateV2();
     if(JSON.stringify(state)!==before)save(true);
     applyRec(true);
-    render();startHb();
+    render();startHb();keepStorage();
   }catch(e){
     app.innerHTML='<div class="card"><h2>Archivio non disponibile</h2><p class="note">Il browser non permette di salvare i dati qui (navigazione privata?). Apri l’app in una finestra normale e riprova.</p><button class="btn" id="retry">Riprova</button></div>';
     document.getElementById('retry').onclick=boot;
