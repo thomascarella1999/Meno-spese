@@ -427,7 +427,7 @@ const list=(file,entity,src,F,label)=>T.push({file,entity,idCol:'id',F,label,
 list('expenses.csv','expense','expenses',{date:'S',amount:'n',cat:'S',note:'S',people:'n',total:'n',km:'n',cons:'n',price:'n',fsplit:'b',pay:'s',rb:'s',rbamt:'n',refuel:'b',extra:'b',xd:'s',veh:'n',fr:'j'},c=>c.cat);
 list('vehicles.csv','vehicle','veh',{name:'S',type:'S',cons:'n',price:'n',ins:'s',insMo:'n',tax:'s',insSusp:'s'},c=>c.type);
 list('routes.csv','route','routes',{name:'S',km:'n',days:'n',rt:'b',vid:'n'},()=>'');
-list('fixed_costs.csv','fixed_cost','fixed',{c:'S',name:'S',amt:'n',v:'n'},c=>c.c);
+list('fixed_costs.csv','fixed_cost','fixed',{c:'S',name:'S',amt:'n',v:'n',t:'s'},c=>c.c);
 list('ledger_moves.csv','ledger_move','entries',{date:'S',desc:'S',amt:'n',m:'S',k:'s',rid:'n'},c=>c.m);
 list('paypal_moves.csv','paypal_move','pp',{date:'S',desc:'S',amt:'n',k:'s',rid:'n'},()=>'');
 list('recurring.csv','recurring','rec',{name:'S',amt:'n',day:'n',led:'S',kind:'S',from:'S'},c=>c.kind);
@@ -614,11 +614,15 @@ function calc(){
 
 /* ---------- componenti ---------- */
 function setupCard(title){
-  const b=budgetOf();
+  const b=budgetOf(),ft=fixedTot();
   return `<div class="card"><h2>${title}</h2>
   ${msg?`<div class="msg" role="alert">${esc(msg)}</div>`:''}
-  <label>Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
-  <label>Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
+  <label>1. Entrate mensili (€)<input id="inc" inputmode="decimal" value="${state.income||''}" placeholder="es. 1500"></label>
+  <h3 style="margin:14px 0 6px">2. Spese fisse: ${eur0(ft)} al mese</h3>
+  <p class="note" style="margin:0 0 8px">Inseriscile prima dell’obiettivo: affitto, bollette, abbonamenti, rate. L’app stima poi quanto puoi risparmiare.</p>
+  <button type="button" class="btn sec" data-act="gofix">${ft>0?'Modifica le spese fisse':'Inserisci le spese fisse'}</button>
+  <h3 style="margin:16px 0 6px">Stima del risparmio</h3>${planInner(state.income,fixItems(),state.goal,true,true)}
+  <label style="margin-top:14px">3. Quanto vuoi mettere da parte ogni mese (€)<input id="goal" inputmode="decimal" value="${state.goal||''}" placeholder="es. 200"></label>
   ${b>0?`<p class="note">Budget per le spese: <strong>${eur0(b)}</strong> al mese.</p>`:''}
   <button class="btn" data-act="saveSetup">Salva</button></div>`;
 }
@@ -634,6 +638,52 @@ const fixedTot=()=>rc((state.fixed||[]).reduce((a,f)=>a+f.amt,0)+(state.noRoutes
 const incReg=mk=>{const L=[...(state.entries||[]),...(state.pp||[])].filter(x=>x.k&&x.amt>0&&x.date.startsWith(mk));return L.length?L.reduce((a,x)=>a+x.amt,0):null;};
 const incOf=mk=>{const L=[...(state.entries||[]),...(state.pp||[])].filter(x=>x.k&&x.amt>0&&x.date.startsWith(mk)),S=L.filter(x=>x.k==='S'),A=L.filter(x=>x.k==='A').reduce((a,x)=>a+x.amt,0);return (S.length?S.reduce((a,x)=>a+x.amt,0):state.income)+A;};
 const budgetOf=mk=>Math.max(0,rc(incOf(mk||dkey(new Date()).slice(0,7))-state.goal-fixedTot()));
+/* ---------- stima del risparmio e dove limare ---------- */
+/* tipo: [id, etichetta, categoria in archivio, % limabile (stima prudente), consiglio] */
+const FT=[['affitto','Affitto o mutuo','Casa',0,'Difficile da ridurre nel breve periodo.'],
+ ['bollette','Luce, gas e acqua','Casa',10,'Confronta le offerte e controlla i consumi.'],
+ ['internet','Internet e telefono','Casa',15,'Confronta tariffe e operatori: le offerte nuove costano meno.'],
+ ['abb','Abbonamenti','Abbonamenti',25,'Tieni solo quelli che usi davvero: disdici o condividi.'],
+ ['auto','Auto: assicurazione e rate','Auto',10,'Chiedi preventivi alternativi prima del rinnovo.'],
+ ['altro','Altre spese fisse','Casa',10,'Controlla se sono ancora tutte necessarie.']];
+const ftype=f=>f.t||(f.c==='Abbonamenti'?'abb':f.c==='Auto'?'auto':'altro');
+const CARB=['carb','Carburante dei tragitti','',8,'Confronta i prezzi dei distributori e guida in modo regolare.'];
+const fixItems=()=>{const L=(state.fixed||[]).map(f=>({t:ftype(f),name:f.name,amt:f.amt})),r=state.noRoutes?0:routesTot();if(r>0)L.push({t:'carb',name:'Carburante dei tragitti',amt:r});return L;};
+const routesMissing=()=>[...new Set((state.routes||[]).filter(r=>{const v=vById(r.vid);return !(v.cons>0&&v.price>0);}).map(r=>vById(r.vid).name))];
+function savePlan(inc,ft){
+  const free=Math.max(0,rc(inc-ft)),cap=(a,b)=>Math.max(0,Math.floor(Math.min(inc*a,free*b)/5)*5);
+  return{free,low:cap(.10,.25),ideal:cap(.20,.40),high:cap(.30,.55),pct:inc>0?Math.round(ft/inc*100):0};
+}
+function trimList(items){
+  return items.map(i=>{const d=i.t==='carb'?CARB:FT.find(x=>x[0]===i.t)||FT[5];return{name:i.name,amt:i.amt,pct:d[3],save:rc(i.amt*d[3]/100),tip:d[4]};}).filter(x=>x.save>=1).sort((a,b)=>b.save-a.save);
+}
+function topVar(){
+  const n=new Date(),ks=[0,1,2].map(i=>{const d=new Date(n.getFullYear(),n.getMonth()-i,1);return d.getFullYear()+'-'+pad(d.getMonth()+1);});
+  const ex=state.expenses.filter(e=>ks.some(k=>e.date.startsWith(k))),mo=new Set(ex.map(e=>e.date.slice(0,7))).size;
+  if(!mo)return[];
+  const t={};ex.forEach(e=>{t[e.cat]=(t[e.cat]||0)+e.amount;});
+  return Object.entries(t).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([c,v])=>({cat:c,avg:v/mo,save:rc(v/mo*0.1)})).filter(x=>x.save>=1);
+}
+/* contenuto (senza riquadro) della stima: usato nell'avvio guidato e nelle Impostazioni */
+function planInner(inc,items,goal,presets,real){
+  if(!(inc>0))return '<p class="note" style="margin:0">Inserisci e salva le entrate mensili per vedere la stima.</p>';
+  const ft=rc(items.reduce((a,i)=>a+i.amt,0)),P=savePlan(inc,ft),TL=trimList(items),tv=real?topVar():[];
+  const tot=rc(TL.reduce((a,x)=>a+x.save,0)+tv.reduce((a,x)=>a+x.save,0));
+  const g=goal>0?goal:P.ideal,left=rc(inc-ft-g),wk=52/12,dm=365/12;
+  let h=`<p style="margin:0 0 8px">Entrate <strong>${eur0(inc)}</strong>, spese fisse <strong>${eur0(ft)}</strong> (${P.pct}% delle entrate). Dopo le spese fisse ti restano <strong>${eur0(P.free)}</strong> al mese.</p>`;
+  if(P.pct>=60)h+=`<p class="note" style="margin:0 0 8px">Le spese fisse pesano molto: è da lì che conviene partire.</p>`;
+  if(P.ideal>0){
+    h+=`<p style="margin:0 0 4px">Risparmio ideale: <strong>circa ${eur0(P.ideal)} al mese</strong>.</p><p class="note" style="margin:0 0 8px">È circa il 20% delle entrate, senza superare il 40% di ciò che resta dopo le spese fisse, così la vita di tutti i giorni non si stringe troppo. Prudente ${eur0(P.low)}, ambizioso ${eur0(P.high)}.</p>`;
+    if(left>0)h+=`<p class="note" style="margin:0 0 8px">${goal>0?`Con ${eur0(goal)} da parte`:`Con ${eur0(P.ideal)} da parte`} ti restano ${eur0(left)} al mese per le spese di tutti i giorni: circa ${eur0(left/wk)} a settimana e ${eur0(left/dm)} al giorno.</p>`;
+  }else h+=`<p style="margin:0 0 8px">Le spese fisse assorbono quasi tutte le entrate: prima di fissare un obiettivo conviene ridurle.</p>`;
+  if(TL.length||tv.length){
+    h+=`<h3 style="margin:12px 0 6px">Da dove cominciare a limare</h3>`+TL.map(x=>`<div class="exp"><div class="what">${esc(x.name)}<small>${eur0(x.amt)} al mese. ${x.tip}</small></div><span class="amt">−${eur0(x.save)}</span></div>`).join('')+
+      tv.map(x=>`<div class="exp"><div class="what">${esc(x.cat)}<small>In media ${eur0(x.avg)} al mese nelle tue spese. Tagliarla del 10% vale ${eur0(x.save)}.</small></div><span class="amt">−${eur0(x.save)}</span></div>`).join('')+
+      `<p class="note" style="margin:8px 0 0">Potresti liberare circa <strong>${eur0(tot)}</strong> al mese, ${eur0(tot*12)} in un anno. Sono stime indicative, non preventivi.</p>`;
+  }
+  if(presets&&P.ideal>0)h+=`<div class="chips" style="margin:12px 0 0">${[['Prudente',P.low],['Consigliato',P.ideal],['Ambizioso',P.high]].map(([l,v])=>`<button type="button" class="chip" data-act="obpreset" data-v="${v}" style="padding:4px 14px">${l} ${eur0(v)}</button>`).join('')}</div>`;
+  return h;
+}
 const vehs=()=>{if(!state.veh||!state.veh.length){const k=state.car||{cons:0,price:0};state.veh=[{id:1,name:'Auto',type:'auto',cons:k.cons||0,price:k.price||0}];state.mainVeh=1;}return state.veh;};
 const vById=id=>vehs().find(v=>v.id===id)||vehs().find(v=>v.id===state.mainVeh)||vehs()[0];
 const car=()=>{const v=vById(state.mainVeh);return{cons:v.cons||0,price:v.price||0};};
@@ -703,7 +753,7 @@ function dayInfo(c){
   const lim=dayLimit(c,sel),sp=c.perDay[sel],fut=(c.isCur&&sel>c.day)||(!c.isCur&&!c.past);
   if(fut)return `<p class="note" style="margin:-4px 0 8px">Limite stimato: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong> con la situazione attuale.${sp>0?` Già pianificati: ${eur2(sp)}.`:''}</p>`;
   const df=lim-sp;
-  return `<p class="note" style="margin:-4px 0 8px">Limite del giorno: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong>. Speso: <strong>${eur2(sp)}</strong>. Saldo: <strong style="color:${df>=0?'var(--ok)':'var(--bad)'}">${df>=0?'+':'−'}${eur2(Math.abs(df))}</strong>${df<0?' (in negativo)':''}.</p>`;
+  return `<p class="note" style="margin:-4px 0 8px">Limite del giorno: <strong style="color:${lim<0?'var(--bad)':'inherit'}">${eur0(lim)}</strong>. Speso: <strong>${eur2(sp)}</strong>. ${df>=0?'Ti è rimasto':'Hai superato il limite di'}: <strong style="color:${df>=0?'var(--ok)':'var(--bad)'}">${eur2(Math.abs(df))}</strong>.</p>`;
 }
 function frRows(n,fr){
   let h='';
@@ -816,6 +866,29 @@ function heroHtml(cls,label,big,sub,c){
   const p=c.budget>0?Math.min(100,Math.round(c.spent/c.budget*100)):0;
   return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p><div class="hprog" role="img" aria-label="Speso il ${p}% del budget mensile"><i style="width:${p}%"></i></div><div class="hmeta"><span>Speso ${eur0(c.spent)}</span><span>Budget ${eur0(c.budget)}</span></div></section>`;
 }
+function paceCard(c){
+  if(c.budget<=0)return '';
+  const row=(l,v,col)=>`<div class="exp"><div class="what">${l}</div><span class="amt"${col?` style="color:${col}"`:''}>${v}</span></div>`;
+  const wq=c.budget/c.dim*7;
+  if(!c.isCur){
+    if(!c.past||c.spent===0)return '';
+    return `<div class="card"><h2>Medie del mese</h2>${row('Spesa media a settimana',eur0(c.spent/c.dim*7))}${row('Spesa media al giorno',eur0(c.spent/c.dim))}${row('Spesa del mese',eur0(c.spent)+' su '+eur0(c.budget))}</div>`;
+  }
+  const n=new Date(),dw=(n.getDay()+6)%7,a=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw)),b=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw+6));
+  const sw=rc(state.expenses.filter(e=>e.date>=a&&e.date<=b).reduce((x,e)=>x+e.amount,0)),left=wq-sw,pc=Math.min(100,Math.round(sw/wq*100));
+  const cur=dkey(n).slice(0,7),by={};
+  state.expenses.forEach(e=>{const k=e.date.slice(0,7);if(k<cur)by[k]=(by[k]||0)+e.amount;});
+  const ks=Object.keys(by).sort().slice(-12),avgM=ks.length?ks.reduce((x,k)=>x+by[k],0)/ks.length:0;
+  const pw=c.proj/c.dim*7;
+  return `<div class="card"><h2>Settimana e mese</h2>
+  <p class="note" style="margin:-4px 0 8px">Il limite giornaliero è solo una guida: puoi sforare un giorno e rientrare nei successivi. Conta il ritmo della settimana e del mese.</p>
+  ${row('Questa settimana',eur0(sw)+' su '+eur0(wq))}
+  <div class="bar" style="margin:6px 0 4px" role="img" aria-label="Speso il ${pc}% della quota settimanale"><i style="width:${pc}%"></i></div>
+  <p class="note" style="margin:0 0 8px">${left>=0?`Questa settimana (lun–dom) ti restano ${eur0(left)}.`:`Questa settimana hai superato la quota di ${eur0(-left)}.`}</p>
+  ${row('Quota settimanale del budget',eur0(wq))}
+  ${c.spent>0?row('Ritmo del mese: a settimana',eur0(pw),c.proj>c.budget?'var(--bad)':'var(--ok)')+row('Ritmo del mese: totale',eur0(c.proj),c.proj>c.budget?'var(--bad)':'var(--ok)'):''}
+  ${ks.length?row('Media mesi passati: a settimana',eur0(avgM/(52/12)))+row('Media mesi passati: al mese',eur0(avgM)):''}</div>`;
+}
 function viewOggi(){
   const c=calc();
   if(sel===null||sel>c.dim)sel=c.isCur?c.day:1;
@@ -856,7 +929,7 @@ function viewOggi(){
     summary=`<div class="card"><p style="margin:0 0 4px">${c.budget>=c.spent?`Restano ${eur0(c.budget-c.spent)} per ${c.daysLeft} ${c.daysLeft===1?'giorno':'giorni'}`:`Sei in negativo di ${eur0(c.spent-c.budget)}`}.</p><p class="note" style="margin:0">${projTxt}</p></div>`;
   }
   const buy=`<div class="card"><div class="qa"><span class="eico">${IC.bag}</span><div style="flex:1;min-width:0"><strong>Stai per comprare qualcosa?</strong><div class="note">Valuta l’impatto sul budget prima di spendere.</div></div></div><button class="btn sec" data-tab="compra" style="margin-top:12px">Valuta un acquisto</button></div>`;
-  return monthNav(c)+warn+(feat('compra')?wishDue():'')+hero+
+  return monthNav(c)+warn+(feat('compra')?wishDue():'')+hero+paceCard(c)+
   `<div class="strip" role="group" aria-label="Giorni del mese">${cells}</div>
   <p class="legend">Tocca un giorno per vedere o aggiungere le sue spese.</p><div class="lgd"><span><i class="s ok"></i>Sotto il limite del giorno</span><span><i class="s warn"></i>Poco sopra</span><span><i class="s bad"></i>Molto sopra</span></div>`+
   dayPanel(c)+summary+`<details class="opts" style="margin:0 0 14px"><summary>Dettagli del mese</summary>${monthOv(c)}</details>`+(feat('compra')?buy:'');
@@ -979,9 +1052,10 @@ function viewCat(){
 function fixedCard(cat,vid){
   const L=(state.fixed||[]).filter(f=>f.c===cat&&(vid?(f.v===vid||(!f.v&&vid===state.mainVeh)):!f.v)),fe=fixEdit&&L.find(x=>x.id===fixEdit);
   const rows=L.map(f=>`<div class="exp"><div class="what">${esc(f.name)}</div><span class="amt">${eur2(f.amt)}</span><button class="link" data-act="fedit" data-id="${f.id}">Modifica</button><button class="link" data-act="fdel" data-id="${f.id}">Elimina</button></div>`).join('');
-  return `<div class="card"><h2>${vid?'Spese fisse':cat}: ${eur2(L.reduce((a,f)=>a+f.amt,0))} al mese</h2>${rows||`<p class="note" style="margin:0 0 8px">${cat==='Auto'?'Aggiungi assicurazione, rata, parcheggio. Per spese annuali, come il bollo, inserisci la quota mensile.':'Aggiungi i tuoi abbonamenti mensili.'}</p>`}
+  return `<div class="card"><h2>${vid?'Spese fisse':cat==='Casa'?'Casa e altre spese fisse':cat}: ${eur2(L.reduce((a,f)=>a+f.amt,0))} al mese</h2>${rows||`<p class="note" style="margin:0 0 8px">${cat==='Auto'?'Aggiungi assicurazione, rata, parcheggio. Per spese annuali, come il bollo, inserisci la quota mensile.':cat==='Casa'?'Aggiungi affitto o mutuo, bollette, internet e telefono. Per spese annuali inserisci la quota mensile.':'Aggiungi i tuoi abbonamenti mensili.'}</p>`}
   <h3>${fe?'Modifica voce':'Nuova voce'}</h3><div class="msg" id="ferr" role="alert" hidden></div>
   <label>Nome<input id="fname" maxlength="30" value="${fe?esc(fe.name):''}"></label>
+  ${cat==='Casa'?`<label>Tipo<select id="ftype">${FT.filter(x=>x[2]==='Casa').map(x=>`<option value="${x[0]}"${(fe?ftype(fe):'altro')===x[0]?' selected':''}>${x[1]}</option>`).join('')}</select></label>`:''}
   <label>Importo al mese (€)<input id="famt" inputmode="decimal" placeholder="0,00" value="${fe?fv(fe.amt):''}"></label>
   <button class="btn" data-act="fadd" data-c="${cat}" data-v="${vid||''}">${fe?'Salva modifica':'Aggiungi'}</button></div>`;
 }
@@ -1112,7 +1186,8 @@ function viewTragitti(){
   const kd=r=>r.km*(r.rt?2:1),wk=r=>r.days*52/12;
   const rows=R.map(r=>{const c=routeCost(r);return `<div class="exp"><div class="what">${esc(r.name)}<small>${esc(vById(r.vid).name)}, ${fmtKm(kd(r))} km al giorno, ${r.days} giorni a settimana${c>0?`, circa ${eur0(c)} al mese`:''}</small></div><button class="link" data-act="redit" data-id="${r.id}">Modifica</button><button class="link" data-act="rdel" data-id="${r.id}">Elimina</button></div>`;}).join('');
   const tm=routesTot(),tl=R.reduce((a,r)=>{const v=vById(r.vid);return a+(v.cons>0?kd(r)/v.cons*wk(r):0);},0);
-  return `<div class="card"><h2>Tragitti fissi</h2>${rows||'<p class="note" style="margin:0">Aggiungi un tragitto abituale, ad esempio casa e lavoro.</p>'}${R.length&&tm>0?`<p class="note" style="margin:8px 0 0">Stima totale: ${eur0(tm)} al mese e ${eur0(tm*12)} all’anno, circa ${n1(tl)} litri al mese.</p>`:''}
+  const mm=routesMissing(),warnR=mm.length?`<div class="card"><p style="margin:0 0 8px"><strong>Il carburante non viene contato.</strong> Per ${mm.map(esc).join(', ')} mancano consumo o prezzo del carburante: finché non li inserisci, i tragitti costano 0 € nel budget.</p><button class="btn sec" data-act="gotoveic">Apri Veicoli</button></div>`:'';
+  return warnR+`<div class="card"><h2>Tragitti fissi</h2>${rows||'<p class="note" style="margin:0">Aggiungi un tragitto abituale, ad esempio casa e lavoro.</p>'}${R.length&&tm>0?`<p class="note" style="margin:8px 0 0">Stima totale: ${eur0(tm)} al mese e ${eur0(tm*12)} all’anno, circa ${n1(tl)} litri al mese.</p>`:''}
   <label class="check tg"><input type="checkbox" id="rtb" ${state.noRoutes?'':'checked'}><span>Conta il carburante dei tragitti nel budget</span></label></div>
   <div class="card"><h3 style="margin:0 0 8px">${re?'Modifica tragitto':'Nuovo tragitto'}</h3><div class="msg" id="rerr" role="alert" hidden></div>
   <label>Nome<input id="rname" maxlength="30" placeholder="Casa – lavoro" value="${re?esc(re.name):''}"></label>
@@ -1124,9 +1199,9 @@ function viewTragitti(){
 
 function viewMensili(){
   const ft=fixedTot(),b=Math.max(0,incOf(dkey(new Date()).slice(0,7))-state.goal);
-  const sw=`<nav class="seg">${[['auto','Veicoli'],['tr','Tragitti'],['abb','Abbonamenti']].map(([v,l])=>`<button data-act="ms" data-v="${v}" ${msub===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
-  const head=b>0?`<div class="card"><p style="margin:0">Spese fisse: <strong>${eur0(ft)}</strong> al mese${routesTot()>0?`, di cui ${eur0(routesTot())} di carburante dei tragitti`:''}. Il budget per le altre spese scende a <strong>${eur0(Math.max(0,b-ft))}</strong> e abbassa il limite giornaliero.</p></div>`:'';
-  return sw+head+(msub==='auto'?viewVeicoli():msub==='tr'?viewTragitti():fixedCard('Abbonamenti'));
+  const sw=`<nav class="seg">${[['fix','Casa'],['auto','Veicoli'],['tr','Tragitti'],['abb','Abbonamenti']].map(([v,l])=>`<button data-act="ms" data-v="${v}" ${msub===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
+  const head=b>0?`<div class="card"><p style="margin:0">Spese fisse: <strong>${eur0(ft)}</strong> al mese${!state.noRoutes&&routesTot()>0?`, di cui ${eur0(routesTot())} di carburante dei tragitti`:''}. Il budget per le altre spese scende a <strong>${eur0(Math.max(0,b-ft))}</strong> e abbassa il limite giornaliero.</p></div>`:'';
+  return sw+head+(msub==='auto'?viewVeicoli():msub==='tr'?viewTragitti():msub==='fix'?fixedCard('Casa'):fixedCard('Abbonamenti'));
 }
 
 function zeroCard(){
@@ -1181,12 +1256,12 @@ function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
   s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
-  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
+  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Sotto il riquadro in alto trovi “Settimana e mese”: quanto hai speso in settimana rispetto alla quota, il ritmo del mese e la media dei mesi passati.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
   s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
-  s('Mensili',['Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
+  s('Mensili',['Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Impostazioni: funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, obiettivo, punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, stima del risparmio e obiettivo (dopo le spese fisse), punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
@@ -1278,6 +1353,7 @@ let wz=0;
 function checks(){
   const S=[],td=dkey(new Date()),ex=state.expenses,V=vehs(),add=(t,ok,msg,fix)=>S.push({t,ok,msg,fix});
   add('Entrate e obiettivo',state.income>0&&state.goal>=0&&state.goal<state.income,state.income>0&&state.goal<state.income?'Entrate mensili e obiettivo di risparmio impostati.':'Mancano le entrate mensili previste, oppure l’obiettivo è troppo alto.',{l:'Apri Impostazioni',a:'gotoimp'});
+  add('Spese fisse',fixedTot()>0,fixedTot()>0?`Spese fisse inserite: ${eur0(fixedTot())} al mese.`:'Non hai inserito spese fisse: senza, la stima del risparmio e il budget sono troppo ottimistici.',fixedTot()>0?null:{l:'Inserisci le spese fisse',a:'gofix'});
   add('Punto zero',!!state.zero,state.zero?`Punto zero al ${dfmt(state.zero.date)}.`:'Nessun punto zero: i saldi dei conti partono da zero.',{l:'Imposta il punto zero',a:'gotoimp'});
   const v0=vById(state.mainVeh),vo=v0.cons>0&&v0.price>0;
   add('Veicolo principale',vo,vo?`${esc(v0.name)}: consumo e prezzo del carburante impostati.`:`Per ${esc(v0.name)} mancano consumo o prezzo del carburante.`,{l:'Apri Veicoli',a:'gotoveic'});
@@ -1317,9 +1393,12 @@ function featCard(){
 }
 const needOnb=()=>!state.onb&&!(state.income>0)&&!(state.expenses&&state.expenses.length);
 function viewOb(){
-  const n=3,st=obs,v=x=>obd[x]!==undefined&&obd[x]!==''?String(obd[x]).replace('.',','):'';
+  const n=4,st=obs,v=x=>obd[x]!==undefined&&obd[x]!==''?String(obd[x]).replace('.',','):'';
+  const fx=obd.fix||{},fv2=k=>fx[k]>0?String(fx[k]).replace('.',','):'';
+  const items=FT.filter(f=>fx[f[0]]>0).map(f=>({t:f[0],name:f[1],amt:fx[f[0]]})),ft=rc(items.reduce((a,i)=>a+i.amt,0)),P=savePlan(obd.inc||0,ft);
   const T=[['Quanto entra ogni mese?','Stipendio o altre entrate regolari. Potrai cambiarlo quando vuoi.',`<label>Entrate mensili (€)<input id="obinc" inputmode="decimal" placeholder="es. 1500" value="${v('inc')}"></label>`],
-    ['Quanto vuoi mettere da parte?',obd.inc>0?`Un buon inizio è circa il 10%: ${eur0(obd.inc/10)} al mese. Il resto, tolte le spese fisse, diventa il tuo budget.`:'Il resto, tolte le spese fisse, diventa il tuo budget.',`<label>Obiettivo di risparmio al mese (€)<input id="obgoal" inputmode="decimal" placeholder="es. 150" value="${v('goal')}"></label>`],
+    ['Quali sono le tue spese fisse?','Quelle che paghi ogni mese, sempre uguali. Lascia vuoto ciò che non hai. Per le spese annuali (bollo, assicurazione) inserisci la quota mensile.',FT.map(f=>`<label>${f[1]} (€ al mese)<input id="obf_${f[0]}" inputmode="decimal" placeholder="0" value="${fv2(f[0])}"></label>`).join('')],
+    ['Quanto puoi mettere da parte?','Prima abbiamo contato entrate e spese fisse: ecco la stima di quanto puoi risparmiare e da dove partire a limare.',`${planInner(obd.inc,items,0,true,false)}<label style="margin-top:14px">Obiettivo di risparmio al mese (€)<input id="obgoal" inputmode="decimal" placeholder="es. ${P.ideal||150}" value="${v('goal')!==''?v('goal'):(P.ideal>0?String(P.ideal):'')}"></label>`],
     ['Quanto hai sui conti adesso?','Facoltativo: serve a calcolare i saldi di carta, contanti e PayPal. Puoi saltare e farlo dopo.',`<label>Carta (€)<input id="obB" inputmode="decimal" placeholder="0,00" value="${v('B')}"></label><label>Contanti (€)<input id="obC" inputmode="decimal" placeholder="0,00" value="${v('C')}"></label><label>PayPal (€)<input id="obP" inputmode="decimal" placeholder="0,00" value="${v('P')}"></label>`]][st];
   return `<div class="progress"><span>Passo ${st+1} di ${n}</span><span>${st===0?'Benvenuto':''}</span></div><div class="bar" style="margin-bottom:12px"><i style="width:${Math.round((st+1)/n*100)}%"></i></div>
   <div class="obhead"><h1>${T[0]}</h1><p class="note" style="margin:0">${T[1]}</p></div>
@@ -1331,9 +1410,17 @@ function obStep(a){
   const g=id=>{const e=document.getElementById(id);return e?mon(e.value):NaN;},err=m=>{const e=document.getElementById('oberr');e.textContent=m;e.hidden=false;};
   if(a==='obback'){obs=Math.max(0,obs-1);render();return;}
   if(obs===0){const x=g('obinc');if(!(x>0))return err('Inserisci le entrate mensili.');obd.inc=x;obs=1;render();return;}
-  if(obs===1){const x=g('obgoal')||0;if(x<0||x>=obd.inc)return err('L’obiettivo deve essere minore delle entrate.');obd.goal=x;obs=2;render();return;}
+  if(obs===1){
+    const fx={};let tot=0;
+    for(const f of FT){const x=g('obf_'+f[0]);if(x<0)return err('Gli importi non possono essere negativi.');if(x>0){fx[f[0]]=x;tot+=x;}}
+    if(tot>=obd.inc)return err('Le spese fisse sono pari o superiori alle entrate: controlla gli importi.');
+    obd.fix=fx;obs=2;render();return;
+  }
+  if(obs===2){const x=g('obgoal')||0;if(x<0||x>=obd.inc)return err('L’obiettivo deve essere minore delle entrate.');obd.goal=x;obs=3;render();return;}
   const B=g('obB')||0,C=g('obC')||0,P=g('obP')||0;
   state.income=obd.inc;state.goal=obd.goal||0;
+  state.fixed=state.fixed||[];
+  FT.forEach((f,i)=>{const x=(obd.fix||{})[f[0]];if(x>0)state.fixed.push({id:Date.now()+i,c:f[2],name:f[1],amt:x,t:f[0]});});
   if(a==='obnext'&&(B||C||P))state.zero={date:dkey(new Date()),B,C,P};
   state.onb=1;state.feat={sfide:0,compra:0,check:0};
   obs=0;obd={};tab='oggi';save();render();window.scrollTo(0,0);
@@ -1537,7 +1624,8 @@ document.addEventListener('click',e=>{
     if(!nm||!(am>0)){const er=document.getElementById('ferr');er.textContent='Inserisci nome e importo mensile.';er.hidden=false;return;}
     state.fixed=state.fixed||[];
     const f=fixEdit&&state.fixed.find(x=>x.id===fixEdit),v=Math.round(am*100)/100;
-    if(f){f.name=nm;f.amt=v;fixEdit=null;}else state.fixed.push({id:Date.now(),c:t.dataset.c,name:nm,amt:v,v:t.dataset.v?parseInt(t.dataset.v,10):undefined});
+    const ts=document.getElementById('ftype'),tp=ts?ts.value:undefined;
+    if(f){f.name=nm;f.amt=v;if(tp)f.t=tp;fixEdit=null;}else state.fixed.push({id:Date.now(),c:t.dataset.c,name:nm,amt:v,v:t.dataset.v?parseInt(t.dataset.v,10):undefined,t:tp});
     save();render();
   }else if(a==='fedit'){fixEdit=parseInt(t.dataset.id,10);render();
   }else if(a==='fdel'){const id=t.dataset.id;softDelete('Voce eliminata',()=>{state.fixed=(state.fixed||[]).filter(x=>String(x.id)!==id);if(String(fixEdit)===id)fixEdit=null;});
@@ -1605,6 +1693,8 @@ document.addEventListener('click',e=>{
   }else if(a==='spp'){spP=t.dataset.v;render();
   }else if(a==='spy'){tab='spese';spP='y';vy=ay;render();window.scrollTo(0,0);
   }else if(a==='obnext'||a==='obback'||a==='obskip'){obStep(a);
+  }else if(a==='obpreset'){const el=document.getElementById('obgoal')||document.getElementById('goal');if(el)el.value=t.dataset.v;
+  }else if(a==='gofix'){tab='auto';msub='fix';render();window.scrollTo(0,0);
   }else if(a==='gotoimp'){tab='impostazioni';render();window.scrollTo(0,0);
   }else if(a==='gotoveic'){tab='auto';msub='auto';render();window.scrollTo(0,0);
   }else if(a==='gotoconti'){tab='conti';render();window.scrollTo(0,0);
