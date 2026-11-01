@@ -295,27 +295,9 @@ details.opts[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px
 <script>
 const PAYS=['Contanti','PayPal','Carta'];
 const CATS=['Casa','Spesa','Trasporti','Uscite e svago','Abbonamenti','Salute','Altro'];
-const PLAN=[
- {t:'Settimana 1: guarda dove vanno i soldi',items:[
-  ['a1','Segna ogni spesa per 7 giorni, anche i piccoli acquisti'],
-  ['a2','Elenca abbonamenti e addebiti ricorrenti'],
-  ['a3','Imposta entrate e obiettivo di risparmio nell’app']]},
- {t:'Settimana 2: taglia il superfluo',items:[
-  ['b1','Disdici o riduci almeno un abbonamento che usi poco'],
-  ['b2','Confronta bollette, telefonia e assicurazioni'],
-  ['b3','Usa la regola delle 24 ore per gli acquisti non essenziali sopra 30 €']]},
- {t:'Settimana 3: sposta i soldi prima di spenderli',items:[
-  ['c1','Metti da parte l’obiettivo appena arriva l’entrata, con un bonifico automatico'],
-  ['c2','Fai la spesa con la lista e riduci i pasti fuori'],
-  ['c3','Fai una settimana in cui compri solo l’essenziale']]},
- {t:'Settimana 4: verifica e correggi',items:[
-  ['d1','Confronta le spese reali con il budget, categoria per categoria'],
-  ['d2','Abbassa del 10% il budget della categoria più alta'],
-  ['d3','Fissa l’obiettivo del mese prossimo']]}
-];
 const MI=['G','F','M','A','M','G','L','A','S','O','N','D'];
 let state={income:0,goal:0,expenses:[],plan:{}};
-let tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
+let spP='m',tab='oggi',msg='',sel=null,editId=null,vy=0,vm=0,ay=0,routeEdit=null,catFilter=null,msub='auto',fixEdit=null,vopen=null,detail=false,obs=0,obd={};
 const app=document.getElementById('app');
 
 /* ---------- icone (SVG, stesso stile: tratto 2px, angoli arrotondati) ---------- */
@@ -794,7 +776,7 @@ function dayPanel(c){
   <p class="note" id="fuelOut" style="margin:-2px 0 10px"></p></div>
   </details>
   <button class="btn" data-act="add">${ed?'Salva modifica':'Aggiungi spesa'}</button>
-  ${ed||detail?'<button class="link" data-act="cancelEdit">Annulla</button>':''}`:`<button class="btn" data-act="qa">Aggiungi una spesa</button><button class="link" data-act="detail">Con più dettagli (divisione, km…)</button>`}
+  ${ed||detail?'<button class="link" data-act="cancelEdit">Annulla</button>':''}`:`<p class="note" style="margin:0 0 8px">Tocca <strong>+</strong> per aggiungere una spesa a questo giorno.</p>`}
   <div class="daybar"><button class="nbtn" data-act="prevD" aria-label="Giorno precedente">${IC.l}</button><span>${short}</span><button class="nbtn" data-act="nextD" aria-label="Giorno successivo">${IC.r}</button></div></div>`;
 }
 
@@ -840,7 +822,7 @@ function viewOggi(){
     const projTxt=c.spent===0?'Aggiungi la prima spesa per vedere la proiezione del mese.':
       diff>=0?`Con questo ritmo chiudi il mese a ${eur0(c.proj)}: ${eur0(diff)} sotto il budget.`:
       `Con questo ritmo chiudi il mese a ${eur0(c.proj)}: ${eur0(-diff)} sopra il budget.`;
-    summary=`<div class="card"><p style="margin:0 0 4px">Hai speso <strong>${eur0(c.spent)}</strong> su ${eur0(c.budget)}. ${c.budget>=c.spent?`Restano ${eur0(c.budget-c.spent)} per ${c.daysLeft} ${c.daysLeft===1?'giorno':'giorni'}`:`Sei in negativo di ${eur0(c.spent-c.budget)}`}.</p><p class="note" style="margin:0">${projTxt}</p></div>`;
+    summary=`<div class="card"><p style="margin:0 0 4px">${c.budget>=c.spent?`Restano ${eur0(c.budget-c.spent)} per ${c.daysLeft} ${c.daysLeft===1?'giorno':'giorni'}`:`Sei in negativo di ${eur0(c.spent-c.budget)}`}.</p><p class="note" style="margin:0">${projTxt}</p></div>`;
   }
   const buy=`<div class="card"><div class="qa"><span class="eico">${IC.bag}</span><div style="flex:1;min-width:0"><strong>Stai per comprare qualcosa?</strong><div class="note">Valuta l’impatto sul budget prima di spendere.</div></div></div><button class="btn sec" data-tab="compra" style="margin-top:12px">Valuta un acquisto</button></div>`;
   return monthNav(c)+warn+(feat('compra')?wishDue():'')+hero+
@@ -851,17 +833,22 @@ function viewOggi(){
 
 function viewSpese(){
   if(catFilter)return viewCat();
-  const c=calc();
+  const c=calc(),yr=spP==='y';
+  const src=yr?state.expenses.filter(e=>e.date.startsWith(vy+'-')):c.exp;
   const nav=monthNav(c);
-  if(!c.exp.length)return nav+`<div class="card empty"><div class="eico">${IC.spese}</div><h2>Nessuna spesa in questo mese</h2><p class="note" style="margin:0">Aggiungile dalla scheda Oggi: qui vedrai dove vanno i soldi.</p></div>`;
-  const tot={};c.exp.forEach(e=>{tot[e.cat]=(tot[e.cat]||0)+e.amount;});
+  if(!src.length)return nav+`<div class="card empty"><div class="eico">${IC.spese}</div><h2>${yr?'Nessuna spesa in questo anno':'Nessuna spesa in questo mese'}</h2><p class="note" style="margin:0">Toccando + in basso a destra aggiungi una spesa: qui vedrai dove vanno i soldi.</p></div>`;
+  const sw=`<nav class="seg" aria-label="Periodo">${[['m','Mese'],['y','Anno '+vy]].map(([v,l])=>`<button data-act="spp" data-v="${v}" ${spP===v?'aria-current="true"':''}>${l}</button>`).join('')}</nav>`;
+  const total=rc(src.reduce((a,e)=>a+e.amount,0)),tot={};src.forEach(e=>{tot[e.cat]=(tot[e.cat]||0)+e.amount;});
   const list=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
-  const top=list[0],pct=Math.round(top[1]/c.spent*100);
+  const top=list[0],pct=Math.round(top[1]/total*100);
+  const tracked=new Set(src.map(e=>e.date.slice(0,7))).size;
+  const cut=yr?top[1]/tracked*0.1*12:top[1]*0.1;
+  const abb=yr&&tot['Abbonamenti']>0?` Gli abbonamenti pesano in media ${eur0(tot['Abbonamenti']/tracked)} al mese: ${eur0(tot['Abbonamenti']/tracked*12)} in un anno.`:'';
   const bars=list.map(([n,v])=>`<button class="cat catb" data-act="catf" data-c="${esc(n)}"><div class="top"><span class="cl">${catIco(n)}${esc(n)}${IC.r}</span><strong>${eur0(v)}</strong></div><div class="bar"><i style="width:${Math.round(v/list[0][1]*100)}%"></i></div></button>`).join('');
   const rows=[...c.exp].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(e=>`<div class="exp">${catIco(e.cat)}<div class="what">${esc(e.cat)}<small>${e.date.slice(8)}/${e.date.slice(5,7)}${sub(e)?' – '+sub(e):''}</small></div><span class="amt">${eur2(e.amount)}</span>${actBtns(e.id)}</div>`).join('');
-  return nav+`<div class="card"><h2>Dove vanno i soldi</h2>${bars}
-  <p class="note" style="margin:8px 0 0">La voce più pesante è ${esc(top[0])}: ${pct}% delle spese. Tagliarla del 10% vale ${eur0(top[1]*0.1)} in un mese.</p></div>
-  <div class="card"><h2>Spese del mese</h2>${splitInfo(c.exp)}${tripInfo(c.exp)}${rows}</div>`;
+  return nav+sw+`<div class="card"><h2>Dove vanno i soldi${yr?' nell’anno':''}</h2>${bars}
+  <p class="note" style="margin:8px 0 0">La voce più pesante è ${esc(top[0])}: ${pct}% delle spese. Tagliarla del 10% vale ${yr?'circa ':''}${eur0(cut)} in ${yr?'un anno':'un mese'}.${abb}</p></div>`+
+  (c.exp.length?`<div class="card"><h2>Spese del mese</h2>${splitInfo(c.exp)}${tripInfo(c.exp)}${rows}</div>`:`<p class="note">Nessuna spesa in ${mlabel(c.y,c.m)}.</p>`);
 }
 
 function viewAnno(){
@@ -869,7 +856,7 @@ function viewAnno(){
   const budget=budgetOf();
   const nav=`<div class="mnav"><button class="nbtn" data-act="prevY" aria-label="Anno precedente">${IC.l}</button><strong>${ay}</strong><button class="nbtn" data-act="nextY" aria-label="Anno successivo">${IC.r}</button></div>`+
     (ay===ny?'':`<div style="margin:-6px 0 12px;text-align:center"><button class="link" data-act="nowY">Anno in corso</button></div>`);
-  if(budget<=0)return nav+`<p class="note">Imposta entrate e obiettivo nella scheda Piano per vedere il riepilogo annuale.</p>`;
+  if(budget<=0)return nav+`<p class="note">Imposta entrate e obiettivo per vedere il riepilogo annuale.</p><button class="btn" data-act="gotoimp">Apri Impostazioni</button>`;
   const yexp=state.expenses.filter(e=>e.date.startsWith(ay+'-'));
   const months=Array(12).fill(0);
   yexp.forEach(e=>{months[parseInt(e.date.slice(5,7),10)-1]+=e.amount;});
@@ -894,20 +881,8 @@ function viewAnno(){
     return `<button class="mrow" data-act="gotoM" data-m="${i}"><span class="mn">${mname(i)}</span><span>${v>0?eur0(v):'—'}</span><span class="d ${cls}">${txt}</span></button>`;
   }).join('');
   const list=`<div class="card" style="padding:4px 16px"><div class="note" style="padding:10px 0 2px">Tocca un mese per aprirlo.</div>${rows}</div>`;
-  let cats='';
-  if(total>0){
-    const tot={};yexp.forEach(e=>{tot[e.cat]=(tot[e.cat]||0)+e.amount;});
-    const l=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
-    const top=l[0],p=Math.round(top[1]/total*100);
-    const bars=l.map(([n,v])=>`<div class="cat"><div class="top"><span class="cl">${catIco(n)}${esc(n)}</span><strong>${eur0(v)}</strong></div><div class="bar"><i style="width:${Math.round(v/l[0][1]*100)}%"></i></div></div>`).join('');
-    const cut=top[1]/tracked*0.1*12;
-    let abb='';
-    if(tot['Abbonamenti']>0){const a=tot['Abbonamenti']/tracked;abb=` Gli abbonamenti pesano in media ${eur0(a)} al mese: ${eur0(a*12)} in un anno.`;}
-    cats=`<div class="card"><h2>Dove vanno i soldi nell’anno</h2>${bars}
-    <p class="note" style="margin:8px 0 0">La voce più pesante è ${esc(top[0])}: ${p}% delle spese. Tagliarla del 10% vale circa ${eur0(cut)} in un anno.${abb}</p></div>`;
-  }
-  const sum=`<div class="card"><p style="margin:0">Hai speso <strong>${eur0(total)}</strong> nel ${ay}, in ${tracked} ${tracked===1?'mese':'mesi'} con spese registrate.</p></div>`;
-  return nav+hero+chart+sum+list+cats;
+  const sum=`<div class="card"><p style="margin:0">Hai speso <strong>${eur0(total)}</strong> nel ${ay}, in ${tracked} ${tracked===1?'mese':'mesi'} con spese registrate.</p>${total>0?'<button class="link" data-act="spy" style="padding:0;margin-top:6px">Vedi le categorie dell’anno</button>':''}</div>`;
+  return nav+hero+chart+sum+list;
 }
 
 function viewAuto(){
@@ -960,7 +935,7 @@ function viewContiOld(){
   <button class="btn" data-act="ppreal">Confronta</button>
   ${df!==null?`<p class="note" style="margin:8px 0 0;color:${Math.abs(df)<0.005?'var(--ok)':'var(--bad)'}">${Math.abs(df)<0.005?'Il saldo torna.':`Differenza: ${eur2(df)}. Aggiungi un movimento per pareggiarla.`}</p>`:''}</div>
   <div class="card"><h2>Movimenti</h2>${rows||'<p class="note" style="margin:0">Nessun movimento.</p>'}</div>
-  <div class="card"><h2>Nuovo movimento</h2>${fld('p',[['E','Entrata'],['U','Uscita']])}<button class="btn" data-act="ppadd">Aggiungi movimento</button></div>`;
+  <div class="card"><h2>Nuovo movimento</h2><p class="note" style="margin-top:0">Le spese con “Pagato con” compaiono già qui da sole: usa questo modulo solo per entrate, prelievi e trasferimenti.</p>${fld('p',[['E','Entrata'],['U','Uscita']])}<button class="btn" data-act="ppadd">Aggiungi movimento</button></div>`;
 }
 
 function viewCat(){
@@ -1022,7 +997,7 @@ function viewConti(){
   <button class="btn" data-act="ppreal" data-k="${k}">Confronta</button>
   ${df!==null?`<p class="note" style="margin:8px 0 0;color:${Math.abs(df)<0.005?'var(--ok)':'var(--bad)'}">${Math.abs(df)<0.005?'Il saldo torna.':`Differenza: ${eur2(df)}. Aggiungi un movimento per pareggiarla.`}</p>`:''}</div>
   <div class="card"><h2>Movimenti</h2>${rows||'<p class="note" style="margin:0">Nessun movimento.</p>'}</div>
-  <div class="card"><h2>Nuovo movimento</h2><div class="msg" id="${pf}err" role="alert" hidden></div><label>Giorno<input id="${pf}dt" type="date" value="${td}"></label><div class="row"><label>Tipo<select id="${pf}k">${ty.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><label>Importo (€)<input id="${pf}amt" inputmode="decimal" placeholder="0,00"></label></div><label>Natura, se è un’entrata<select id="${pf}c"><option value="">Altro o trasferimento</option><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label><label>Descrizione (facoltativa)<input id="${pf}desc" maxlength="40"></label><button class="btn" data-act="${k==='P'?'ppadd':'eadd'}">Aggiungi movimento</button></div>`;
+  <div class="card"><h2>Nuovo movimento</h2><p class="note" style="margin-top:0">Le spese con “Pagato con” compaiono già qui da sole: usa questo modulo solo per entrate, prelievi e trasferimenti.</p><div class="msg" id="${pf}err" role="alert" hidden></div><label>Giorno<input id="${pf}dt" type="date" value="${td}"></label><div class="row"><label>Tipo<select id="${pf}k">${ty.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><label>Importo (€)<input id="${pf}amt" inputmode="decimal" placeholder="0,00"></label></div><label>Natura, se è un’entrata<select id="${pf}c"><option value="">Altro o trasferimento</option><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label><label>Descrizione (facoltativa)<input id="${pf}desc" maxlength="40"></label><button class="btn" data-act="${k==='P'?'ppadd':'eadd'}">Aggiungi movimento</button></div>`;
 }
 
 function updEst(){
@@ -1123,19 +1098,6 @@ function viewMensili(){
   return sw+head+(msub==='auto'?viewVeicoli():msub==='tr'?viewTragitti():fixedCard('Abbonamenti'));
 }
 
-function viewPiano(){
-  const all=PLAN.flatMap(w=>w.items),done=all.filter(i=>state.plan[i[0]]).length;
-  const weeks=PLAN.map(w=>`<h3>${w.t}</h3><div class="card" style="padding:4px 16px">${w.items.map(([id,t])=>`<label class="check${state.plan[id]?' done':''}"><input type="checkbox" data-plan="${id}" ${state.plan[id]?'checked':''}><span>${t}</span></label>`).join('')}</div>`).join('');
-  return `<div class="progress"><span>Piano di 30 giorni</span><span>${done} di ${all.length}</span></div>
-  <div class="bar" style="margin-bottom:8px"><i style="width:${Math.round(done/all.length*100)}%"></i></div>
-  ${weeks}
-  <h3>Regole veloci</h3><div class="card"><ul class="rules">
-  <li>Prima risparmi, poi spendi: l’obiettivo esce appena arriva l’entrata.</li>
-  <li>Aspetta 24 ore prima di un acquisto non necessario.</li>
-  <li>Controlla gli abbonamenti ogni 3 mesi.</li>
-  <li>Le piccole spese ripetute pesano più di quelle grandi e rare.</li></ul></div>
-`;
-}
 function zeroCard(){
   const z=state.zero||{},td=dkey(new Date());
   const f=(id,l)=>`<label>${l} (€)<input id="${id}" inputmode="decimal" placeholder="0,00" value="${z[id.slice(1)]!==undefined?String(z[id.slice(1)]).replace('.',','):''}"></label>`;
@@ -1154,6 +1116,12 @@ function recCard(){
   <div class="row"><label>Conto<select id="rcl"><option value="B">Carta</option><option value="C">Contanti</option><option value="P">PayPal</option></select></label><label>Natura<select id="rck"><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label></div>
   <button class="btn" data-act="recadd">Aggiungi entrata fissa</button></div>`;
 }
+function entrateCard(){
+  const a=setupCard('Entrate e obiettivo'),r=recCard();
+  const head=a.slice(0,a.lastIndexOf('</div>'));
+  const inner=r.replace('<div class="card"><h2>Entrate fisse</h2>','<h3 style="margin-top:18px">Entrate fisse automatiche</h3>');
+  return head+'<p class="note">Le entrate qui sono previsioni. Quando registri entrate vere nei Conti, per quel mese lo stipendio sostituisce la previsione e le altre entrate si sommano.</p>'+inner;
+}
 function applyRec(silent){
   const n=new Date(),cm=n.getFullYear()*12+n.getMonth();let ch=false;
   (state.rec||[]).forEach(r=>{
@@ -1171,26 +1139,23 @@ function applyRec(silent){
   if(ch)save(silent);
 }
 function viewImpostazioni(){
-  return `${setupCard('Entrate e obiettivo')}${zeroCard()}${recCard()}${featCard()}
+  return `${entrateCard()}${zeroCard()}${featCard()}
 
-  <h3>Backup</h3><div class="card"><p class="note" style="margin-top:0">Copia questo testo e incollalo in un posto sicuro, ad esempio nelle Note. Per ripristinare i dati, incolla qui il testo salvato e premi Ripristina.</p>
-  <textarea id="bk" class="ta" rows="4">${esc(JSON.stringify(state))}</textarea>
-  <div class="row"><button class="btn" data-act="copyBk">Copia backup</button><button class="btn" data-act="restoreBk">Ripristina</button></div></div>
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
-  <h3>I tuoi dati</h3><div class="card"><p class="note" style="margin-top:0">I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: esportali ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expEvents">Dati d’uso</button><button class="btn" data-act="expAll">Tutti i dati</button></div></div>`;
+  <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
 }
 
 /* ---------- guida ---------- */
 function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
-  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Piano, Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
+  s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
   s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
-  s('Spese',['Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
-  s('Anno',['Grafico dei 12 mesi con il budget, risparmio dei mesi conclusi, categorie dell’anno. Tocca un mese per aprirlo.'])+
+  s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
+  s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
   s('Mensili',['Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
   s('Conti',['Carta, Contanti, PayPal: saldo calcolato, saldo reale con differenza, movimenti e nuovo movimento.','Per le entrate scegli la natura: lo stipendio sostituisce le entrate previste del mese, l’altra entrata si aggiunge sopra. Altro o trasferimento non conta.'])+
-  s('Dal menu',['Piano: i 30 giorni di azioni. Impostazioni: funzioni da attivare o nascondere (Piano, Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, obiettivo, punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
+  s('Dal menu',['Impostazioni: funzioni da attivare o nascondere (Sfide, Prima di comprare, Controllo guidato, Fumo), entrate previste, obiettivo, punto zero dei conti, entrate fisse automatiche, backup e dati.','Sfide: tre al giorno e due a settimana, con risparmio stimato e serie di giorni.','Fumo: si attiva in Impostazioni; segni ogni sigaretta e il momento, e vedi quelle recuperate.','I dati sono salvati in questo browser e non si sincronizzano tra dispositivi: per spostarli usa il backup in Impostazioni.'])
 }
 
 /* ---------- sfide ---------- */
@@ -1299,7 +1264,7 @@ function checks(){
   const dn=[];
   ['B','C','P'].forEach(k=>{const r=state[{P:'ppReal',B:'realB',C:'realC'}[k]];if(typeof r==='number'){const b=(state.zero?state.zero[k]||0:0)+ledgerMoves(k).reduce((a,x)=>a+x.a,0);if(Math.abs(r-b)>0.005)dn.push(`${LG[k]} (${eur2(r-b)})`);}});
   add('Saldi dei conti',dn.length===0,dn.length?`Differenza tra saldo reale e calcolato: ${dn.join(', ')}. Aggiungi un movimento per pareggiare.`:'Nessuna differenza nei saldi reali inseriti.',dn.length?{l:'Apri Conti',a:'gotoconti'}:null);
-  add('Salvataggio',saveOk!==false,saveOk===false?'Il salvataggio automatico non funziona: fai un backup da Impostazioni.':'Il salvataggio funziona.',saveOk===false?{l:'Apri Impostazioni',a:'gotoimp'}:null);
+  add('Salvataggio',saveOk!==false,saveOk===false?'Il salvataggio automatico non funziona: scarica il backup CSV da Impostazioni.':'Il salvataggio funziona.',saveOk===false?{l:'Apri Impostazioni',a:'gotoimp'}:null);
   return S;
 }
 function viewCheck(){
@@ -1316,7 +1281,7 @@ function viewCheck(){
 
 /* ---------- funzioni attivabili, onboarding, inserimento rapido ---------- */
 function featCard(){
-  const L=[['piano','Piano di 30 giorni'],['sfide','Sfide'],['compra','Prima di comprare'],['check','Controllo guidato']];
+  const L=[['sfide','Sfide'],['compra','Prima di comprare'],['check','Controllo guidato']];
   return `<div class="card"><h2>Funzioni</h2><p class="note" style="margin-top:0">Tieni solo ciò che ti serve: le altre restano nascoste e l’app resta più semplice. I dati non si perdono.</p>${L.map(([k,l])=>`<label class="check tg"><input type="checkbox" data-feat="${k}" ${feat(k)?'checked':''}><span>${l}</span></label>`).join('')}<label class="check tg" style="margin:0"><input type="checkbox" id="smon" ${state.smoke&&state.smoke.on?'checked':''}><span>Fumo: monitora le sigarette</span></label></div>`;
 }
 const needOnb=()=>!state.onb&&!(state.income>0)&&!(state.expenses&&state.expenses.length);
@@ -1339,7 +1304,7 @@ function obStep(a){
   const B=g('obB')||0,C=g('obC')||0,P=g('obP')||0;
   state.income=obd.inc;state.goal=obd.goal||0;
   if(a==='obnext'&&(B||C||P))state.zero={date:dkey(new Date()),B,C,P};
-  state.onb=1;state.feat={piano:0,sfide:0,compra:0,check:0};
+  state.onb=1;state.feat={sfide:0,compra:0,check:0};
   obs=0;obd={};tab='oggi';save();render();window.scrollTo(0,0);
   showToast('Tutto pronto: tocca + per la prima spesa');
 }
@@ -1396,16 +1361,16 @@ function quickAdd(){
 
 let menuOpen=false;
 const feat=k=>!state.feat||state.feat[k]!==0;
-const pageList=()=>[['piano','Piano di 30 giorni',IC.list],['sfide','Sfide',IC.trophy],['compra','Prima di comprare',IC.bag],['fumo','Fumo',IC.smoke],['check','Controllo guidato',IC.clip],['guida','Guida',IC.help],['impostazioni','Impostazioni',IC.gear]].filter(p=>p[0]==='fumo'?!!(state.smoke&&state.smoke.on):['piano','sfide','compra','check'].includes(p[0])?feat(p[0]):true);
+const pageList=()=>[['sfide','Sfide',IC.trophy],['compra','Prima di comprare',IC.bag],['fumo','Fumo',IC.smoke],['check','Controllo guidato',IC.clip],['guida','Guida',IC.help],['impostazioni','Impostazioni',IC.gear]].filter(p=>p[0]==='fumo'?!!(state.smoke&&state.smoke.on):['sfide','compra','check'].includes(p[0])?feat(p[0]):true);
 function drawTop(){
   const ini=((user.nome||'')[0]||'')+((user.cognome||'')[0]||'');
   const items=pageList();
-  document.getElementById('top').innerHTML=`<div class="in"><div class="brand">${IC.logo}<span>Meno spese</span></div><span class="sp"></span><div class="menuwrap"><button class="avatar" data-act="menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Menu: piano, sfide, impostazioni e altro">${esc(ini.toUpperCase())}</button>${menuOpen?`<div class="menu" role="menu"><div class="mh"><strong>${esc(user.nome+' '+user.cognome)}</strong></div>${items.map(([k,l,ic])=>`<button role="menuitem" data-tab="${k}" ${tab===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('')}</div>`:''}</div></div>`;
+  document.getElementById('top').innerHTML=`<div class="in"><div class="brand">${IC.logo}<span>Meno spese</span></div><span class="sp"></span><div class="menuwrap"><button class="avatar" data-act="menu" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Menu: sfide, impostazioni e altro">${esc(ini.toUpperCase())}</button>${menuOpen?`<div class="menu" role="menu"><div class="mh"><strong>${esc(user.nome+' '+user.cognome)}</strong></div>${items.map(([k,l,ic])=>`<button role="menuitem" data-tab="${k}" ${tab===k?'aria-current="page"':''}>${ic}<span>${l}</span></button>`).join('')}</div>`:''}</div></div>`;
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menuOpen){menuOpen=false;drawTop();}});
 function render(){
   const tabs=[['oggi','Oggi'],['spese','Spese'],['anno','Anno'],['auto','Mensili'],['conti','Conti']];
-  const V={oggi:viewOggi,spese:viewSpese,anno:viewAnno,auto:viewMensili,conti:viewConti,piano:viewPiano,sfide:viewSfide,compra:viewBuy,fumo:viewFumo,check:viewCheck,guida:viewGuida,impostazioni:viewImpostazioni};
+  const V={oggi:viewOggi,spese:viewSpese,anno:viewAnno,auto:viewMensili,conti:viewConti,sfide:viewSfide,compra:viewBuy,fumo:viewFumo,check:viewCheck,guida:viewGuida,impostazioni:viewImpostazioni};
   if(!['oggi','spese','anno','auto','conti'].includes(tab)&&!pageList().some(p=>p[0]===tab))tab='oggi';
   const v=(V[tab]||viewOggi)();
   const pg=pageList().find(p=>p[0]===tab);
@@ -1609,7 +1574,8 @@ document.addEventListener('click',e=>{
   }else if(a==='wzp'){wz=Math.max(0,wz-1);render();
   }else if(a==='wzr'){wz=0;render();
   }else if(a==='qa'){quickAdd();
-  }else if(a==='detail'){detail=true;editId=null;render();const dc=document.getElementById('daycard');if(dc)dc.scrollIntoView({block:'start'});
+  }else if(a==='spp'){spP=t.dataset.v;render();
+  }else if(a==='spy'){tab='spese';spP='y';vy=ay;render();window.scrollTo(0,0);
   }else if(a==='obnext'||a==='obback'||a==='obskip'){obStep(a);
   }else if(a==='gotoimp'){tab='impostazioni';render();window.scrollTo(0,0);
   }else if(a==='gotoveic'){tab='auto';msub='auto';render();window.scrollTo(0,0);
@@ -1627,17 +1593,7 @@ document.addEventListener('click',e=>{
     (state.rec=state.rec||[]).push({id:Date.now(),name:nm,amt:Math.round(am*100)/100,day:dy,led:document.getElementById('rcl').value,kind:document.getElementById('rck').value,from:dkey(new Date()).slice(0,7)});
     applyRec();save();render();
   }else if(a==='recdel'){const id=t.dataset.id;softDelete('Entrata fissa eliminata',()=>{state.rec=(state.rec||[]).filter(x=>String(x.id)!==id);});
-  }else if(a==='copyBk'){
-    const ta=document.getElementById('bk');ta.select();
-    try{navigator.clipboard.writeText(ta.value);}catch(e1){try{document.execCommand('copy');}catch(e2){}}
-    t.textContent='Copiato';
-  }else if(a==='restoreBk'){
-    try{
-      const d=JSON.parse(document.getElementById('bk').value);
-      if(!d||!Array.isArray(d.expenses))throw new Error('formato');
-      state=DB.norm(Object.assign({income:0,goal:0,expenses:[],plan:{}},d));
-      save();tab='oggi';render();
-    }catch(e3){t.textContent='Testo non valido';}
+
   }
 });
 app.addEventListener('input',e=>{
@@ -1647,14 +1603,12 @@ app.addEventListener('input',e=>{
   if(['ekm','vcons','vcl100','vprice'].includes(id))updEst();
 });
 app.addEventListener('change',e=>{
-  if(e.target.dataset&&e.target.dataset.feat){state.feat=Object.assign({piano:1,sfide:1,compra:1,check:1},state.feat||{});state.feat[e.target.dataset.feat]=e.target.checked?1:0;save();render();return;}
+  if(e.target.dataset&&e.target.dataset.feat){state.feat=Object.assign({sfide:1,compra:1,check:1},state.feat||{});state.feat[e.target.dataset.feat]=e.target.checked?1:0;save();render();return;}
   if(e.target.id==='smon'){state.smoke=state.smoke||{};state.smoke.on=e.target.checked;save();render();return;}
   if(e.target.dataset.ch){const k=e.target.dataset.ch;state.ch=state.ch||{};if(e.target.checked)state.ch[k]={e:parseFloat(e.target.dataset.e)||0,d:e.target.dataset.d};else delete state.ch[k];save();render();return;}
   if(e.target.id==='rtb'){state.noRoutes=!e.target.checked;save();render();return;}
   if(['split','trip','fsplit','refuel','extra'].includes(e.target.id)){updQuota();return;}
   if(e.target.id==='vsel'){const v=vById(parseInt(e.target.value,10));if(!editId){document.getElementById('cons').value=fv(v.cons);document.getElementById('cl100').value=l100v(v.cons);document.getElementById('price').value=fv(v.price);}updQuota();return;}
-  const id=e.target.dataset.plan;if(!id)return;
-  state.plan[id]=e.target.checked;save();render();
 });
 
 /* ---------- installazione sulla Home (Android: automatica; iPhone: guidata) ---------- */
