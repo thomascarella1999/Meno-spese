@@ -1238,19 +1238,19 @@ function entrateCard(){
   const hasS=L.some(x=>x.k==='S'),tot=incOf(mk);
   const m=msg?`<div class="msg" role="alert">${esc(msg)}</div>`:'';
   const fv2=n=>String(n).replace('.',',');
-  const head=`<div class="card"><h2>Entrate di questo mese</h2><p style="margin:0;font-size:1.6em;font-weight:700;color:var(--ok)">${eur2(tot)}</p><p class="note" style="margin:6px 0 0">Il totale è la somma delle card qui sotto. Lo stipendio sostituisce la card “${esc(state.incName||'Entrate previste')}”, le altre entrate si sommano.</p></div>${m}`;
-  const prev=`<div class="card"><label>Nome<input id="pin" maxlength="30" value="${esc(state.incName||'Entrate previste')}"></label><label>Importo mensile (€)<input id="pia" inputmode="decimal" placeholder="es. 1500" value="${state.income?fv2(state.income):''}"></label>${hasS?'<p class="note" style="margin:0 0 8px">Al momento non conta: c’è uno stipendio registrato in questo mese.</p>':''}<button class="btn" data-act="incsave">Salva</button></div>`;
+  const head=`<div class="card"><h2>Entrate mensili</h2><p style="margin:0;font-size:1.6em;font-weight:700;color:var(--ok)">${eur2(tot)}</p><p class="note" style="margin:6px 0 0">Il totale è la somma di tutte le entrate qui sotto.</p></div>${m}`;
+  const prev=`<div class="card"><label>Nome<input id="pin" maxlength="30" value="${esc(state.incName||'Entrate previste')}"></label><label>Importo mensile (€)<input id="pia" inputmode="decimal" placeholder="es. 1500" value="${state.income?fv2(state.income):''}"></label>${hasS?'<p class="note" style="margin:0 0 8px">Al momento non viene contata: in questo mese c’è già uno stipendio registrato nei Conti.</p>':''}<button class="btn" data-act="incsave">Salva</button></div>`;
   const recs=[...(state.rec||[])].sort((x,y)=>y.amt-x.amt).map(r=>{
     const done=L.some(x=>String(x.rid)===String(r.id));
-    return `<div class="card"><label>Nome<input id="rn_${r.id}" maxlength="30" value="${esc(r.name)}"></label><label>Importo (€)<input id="ra_${r.id}" inputmode="decimal" value="${fv2(r.amt)}"></label><p class="note" style="margin:0 0 8px">${r.kind==='S'?'Stipendio':'Altra entrata'} · ogni mese il giorno ${r.day} · ${LG[r.led]}${done?'':' · in arrivo, non ancora contata'}</p><div class="row"><button class="btn" data-act="recsave" data-id="${r.id}">Salva</button><button class="btn sec" data-act="recdel" data-id="${r.id}">Elimina</button></div></div>`;
+    return `<div class="card"><label>Nome<input id="rn_${r.id}" maxlength="30" value="${esc(r.name)}"></label><label>Importo (€)<input id="ra_${r.id}" inputmode="decimal" value="${fv2(r.amt)}"></label><p class="note" style="margin:0 0 8px">${r.kind==='S'?'Stipendio · ':''}Ogni mese il giorno ${r.day} · ${LG[r.led]}${done?'':' · in arrivo, non ancora contata'}</p><div class="row"><button class="btn" data-act="recsave" data-id="${r.id}">Salva</button><button class="btn sec" data-act="recdel" data-id="${r.id}">Elimina</button></div></div>`;
   }).join('');
   const man=L.filter(x=>!x.rid||!(state.rec||[]).some(r=>String(r.id)===String(x.rid)));
   const manual=man.length?`<div class="card"><h2>Registrate nei Conti</h2>${man.map(x=>`<div class="exp"><div class="what">${esc(x.desc||'Entrata')}<small>${x.k==='S'?'Stipendio':'Altra entrata'} · ${dfmt(x.date)}</small></div><span class="amt" style="color:var(--ok)">+${eur2(x.amt)}</span></div>`).join('')}</div>`:'';
-  const add=`<div class="card"><h2>Aggiungi entrata</h2><p class="note" style="margin-top:0">Crea una nuova card. Si ripete da sola ogni mese, dal giorno che scegli.</p>
+  const add=`<div class="card"><h2>Aggiungi entrata</h2><p class="note" style="margin-top:0">Aggiungi un’altra entrata: si somma alle altre e si ripete da sola ogni mese, dal giorno che scegli.</p>
   <div class="msg" id="rcerr" role="alert" hidden></div>
-  <label>Nome<input id="rcn" maxlength="30" placeholder="Stipendio"></label>
+  <label>Nome<input id="rcn" maxlength="30" placeholder="es. Affitto da inquilino"></label>
   <div class="row"><label>Importo (€)<input id="rca" inputmode="decimal"></label><label>Giorno del mese<input id="rcd" inputmode="numeric" placeholder="27" value="${td}"></label></div>
-  <div class="row"><label>Conto<select id="rcl"><option value="B">Carta</option><option value="C">Contanti</option><option value="P">PayPal</option></select></label><label>Tipo<select id="rck"><option value="S">Stipendio</option><option value="A" selected>Altra entrata</option></select></label></div>
+  <label>Conto<select id="rcl"><option value="B">Carta</option><option value="C">Contanti</option><option value="P">PayPal</option></select></label>
   <button class="btn" data-act="recadd">Aggiungi entrata</button></div>`;
   return head+prev+recs+manual+add;
 }
@@ -1871,7 +1871,7 @@ document.addEventListener('click',e=>{
   }else if(a==='recadd'){
     const nm=document.getElementById('rcn').value.trim(),am=mon(document.getElementById('rca').value),dy=parseInt(document.getElementById('rcd').value,10);
     if(!nm||!(am>0)||!(dy>=1&&dy<=31)){const er=document.getElementById('rcerr');er.textContent='Inserisci nome, importo e giorno del mese (da 1 a 31).';er.hidden=false;return;}
-    (state.rec=state.rec||[]).push({id:Date.now(),name:nm,amt:Math.round(am*100)/100,day:dy,led:document.getElementById('rcl').value,kind:document.getElementById('rck').value,from:dkey(new Date()).slice(0,7)});
+    (state.rec=state.rec||[]).push({id:Date.now(),name:nm,amt:Math.round(am*100)/100,day:dy,led:document.getElementById('rcl').value,kind:'A',from:dkey(new Date()).slice(0,7)});
     applyRec();save();render();
   }else if(a==='recdel'){const id=t.dataset.id;softDelete('Entrata eliminata',()=>{const mk=dkey(new Date()).slice(0,7),keep=x=>!(String(x.rid)===id&&x.date.startsWith(mk));state.rec=(state.rec||[]).filter(x=>String(x.id)!==id);state.entries=(state.entries||[]).filter(keep);state.pp=(state.pp||[]).filter(keep);});
 
