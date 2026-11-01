@@ -109,6 +109,7 @@ nav.seg button[aria-current="true"]{background:var(--brand);color:var(--brand-in
 .hero .sub{margin:0 0 16px;font-size:.92rem;font-weight:500}
 .hprog,.hero .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.28);overflow:hidden}
 .hprog i,.hero .bar>i{display:block;height:100%;border-radius:99px;background:#fff;transition:width .5s ease}
+.hbud+.hbud{margin-top:14px}
 .hmeta{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:.85rem;font-weight:600;font-variant-numeric:tabular-nums}
 
 /* ---------- calendario ---------- */
@@ -863,31 +864,15 @@ function dayPanel(c){
 
 /* ---------- schede ---------- */
 function heroHtml(cls,label,big,sub,c){
-  const p=c.budget>0?Math.min(100,Math.round(c.spent/c.budget*100)):0;
-  return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p><div class="hprog" role="img" aria-label="Speso il ${p}% del budget mensile"><i style="width:${p}%"></i></div><div class="hmeta"><span>Speso ${eur0(c.spent)}</span><span>Budget ${eur0(c.budget)}</span></div></section>`;
-}
-function paceCard(c){
-  if(c.budget<=0)return '';
-  const row=(l,v,col)=>`<div class="exp"><div class="what">${l}</div><span class="amt"${col?` style="color:${col}"`:''}>${v}</span></div>`;
-  const wq=c.budget/c.dim*7;
-  if(!c.isCur){
-    if(!c.past||c.spent===0)return '';
-    return `<div class="card"><h2>Medie del mese</h2>${row('Spesa media a settimana',eur0(c.spent/c.dim*7))}${row('Spesa media al giorno',eur0(c.spent/c.dim))}${row('Spesa del mese',eur0(c.spent)+' su '+eur0(c.budget))}</div>`;
+  const bar=(l,sp,bu)=>{const p=bu>0?Math.min(100,Math.round(sp/bu*100)):0,r=bu-sp;
+    return `<div class="hbud"><div class="hmeta" style="margin:0 0 6px"><span>${l}</span><span>${r>=0?'Restano '+eur0(r):'Oltre di '+eur0(-r)}</span></div><div class="hprog" role="img" aria-label="${l}: speso il ${p}%"><i style="width:${p}%"></i></div><div class="hmeta"><span>Speso ${eur0(sp)}</span><span>Budget ${eur0(bu)}</span></div></div>`;};
+  let bars=bar('Budget mensile',c.spent,c.budget);
+  if(c.isCur){
+    const n=new Date(),dw=(n.getDay()+6)%7,a=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw)),b=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw+6));
+    const sw=rc(state.expenses.filter(e=>e.date>=a&&e.date<=b).reduce((x,e)=>x+e.amount,0));
+    bars=bar('Budget settimanale (lun–dom)',sw,c.budget/c.dim*7)+bars;
   }
-  const n=new Date(),dw=(n.getDay()+6)%7,a=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw)),b=dkey(new Date(n.getFullYear(),n.getMonth(),n.getDate()-dw+6));
-  const sw=rc(state.expenses.filter(e=>e.date>=a&&e.date<=b).reduce((x,e)=>x+e.amount,0)),left=wq-sw,pc=Math.min(100,Math.round(sw/wq*100));
-  const cur=dkey(n).slice(0,7),by={};
-  state.expenses.forEach(e=>{const k=e.date.slice(0,7);if(k<cur)by[k]=(by[k]||0)+e.amount;});
-  const ks=Object.keys(by).sort().slice(-12),avgM=ks.length?ks.reduce((x,k)=>x+by[k],0)/ks.length:0;
-  const pw=c.proj/c.dim*7;
-  return `<div class="card"><h2>Settimana e mese</h2>
-  <p class="note" style="margin:-4px 0 8px">Il limite giornaliero è solo una guida: puoi sforare un giorno e rientrare nei successivi. Conta il ritmo della settimana e del mese.</p>
-  ${row('Questa settimana',eur0(sw)+' su '+eur0(wq))}
-  <div class="bar" style="margin:6px 0 4px" role="img" aria-label="Speso il ${pc}% della quota settimanale"><i style="width:${pc}%"></i></div>
-  <p class="note" style="margin:0 0 8px">${left>=0?`Questa settimana (lun–dom) ti restano ${eur0(left)}.`:`Questa settimana hai superato la quota di ${eur0(-left)}.`}</p>
-  ${row('Quota settimanale del budget',eur0(wq))}
-  ${c.spent>0?row('Ritmo del mese: a settimana',eur0(pw),c.proj>c.budget?'var(--bad)':'var(--ok)')+row('Ritmo del mese: totale',eur0(c.proj),c.proj>c.budget?'var(--bad)':'var(--ok)'):''}
-  ${ks.length?row('Media mesi passati: a settimana',eur0(avgM/(52/12)))+row('Media mesi passati: al mese',eur0(avgM)):''}</div>`;
+  return `<section class="hero ${cls}"><div class="label">${label}</div><div class="big">${big}</div><p class="sub">${sub}</p>${bars}</section>`;
 }
 function viewOggi(){
   const c=calc();
@@ -929,7 +914,7 @@ function viewOggi(){
     summary=`<div class="card"><p style="margin:0 0 4px">${c.budget>=c.spent?`Restano ${eur0(c.budget-c.spent)} per ${c.daysLeft} ${c.daysLeft===1?'giorno':'giorni'}`:`Sei in negativo di ${eur0(c.spent-c.budget)}`}.</p><p class="note" style="margin:0">${projTxt}</p></div>`;
   }
   const buy=`<div class="card"><div class="qa"><span class="eico">${IC.bag}</span><div style="flex:1;min-width:0"><strong>Stai per comprare qualcosa?</strong><div class="note">Valuta l’impatto sul budget prima di spendere.</div></div></div><button class="btn sec" data-tab="compra" style="margin-top:12px">Valuta un acquisto</button></div>`;
-  return monthNav(c)+warn+(feat('compra')?wishDue():'')+hero+paceCard(c)+
+  return monthNav(c)+warn+(feat('compra')?wishDue():'')+hero+
   `<div class="strip" role="group" aria-label="Giorni del mese">${cells}</div>
   <p class="legend">Tocca un giorno per vedere o aggiungere le sue spese.</p><div class="lgd"><span><i class="s ok"></i>Sotto il limite del giorno</span><span><i class="s warn"></i>Poco sopra</span><span><i class="s bad"></i>Molto sopra</span></div>`+
   dayPanel(c)+summary+`<details class="opts" style="margin:0 0 14px"><summary>Dettagli del mese</summary>${monthOv(c)}</details>`+(feat('compra')?buy:'');
@@ -1105,12 +1090,6 @@ function viewConti(){
   <div class="card"><h2>Nuovo movimento</h2><p class="note" style="margin-top:0">Le spese con “Pagato con” compaiono già qui da sole: usa questo modulo solo per entrate, prelievi e trasferimenti.</p><div class="msg" id="${pf}err" role="alert" hidden></div><label>Giorno<input id="${pf}dt" type="date" value="${td}"></label><div class="row"><label>Tipo<select id="${pf}k">${ty.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><label>Importo (€)<input id="${pf}amt" inputmode="decimal" placeholder="0,00"></label></div><label>Natura, se è un’entrata<select id="${pf}c"><option value="">Altro o trasferimento</option><option value="S">Stipendio</option><option value="A">Altra entrata</option></select></label><label>Descrizione (facoltativa)<input id="${pf}desc" maxlength="40"></label><button class="btn" data-act="${k==='P'?'ppadd':'eadd'}">Aggiungi movimento</button></div>`;
 }
 
-function updEst(){
-  const o=document.getElementById('estOut');if(!o)return;
-  const k=num(document.getElementById('ekm').value),c=num(document.getElementById('vcons').value),p=num(document.getElementById('vprice').value);
-  o.textContent=k>0&&c>0?`${n1(k/c)} litri${p>0?`, circa ${eur2(k/c*p)}`:''} (${fmtCons(c)}).`:'';
-}
-
 function refuelV(vo){
   const R=state.expenses.filter(e=>(e.veh?vById(e.veh).id:state.mainVeh)===vo.id&&(e.refuel||/carburante|rifornimento/i.test(e.note||''))).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
   if(!R.length)return `<div class="card"><h2>Rifornimenti</h2><p class="note" style="margin:0">Spunta “Rifornimento” quando registri una spesa e scegli questo veicolo: qui vedrai i km che dovresti fare.</p></div>`;
@@ -1137,7 +1116,6 @@ function viewVeicoli(){
   <div class="row"><label>Consumo (km/l)<input id="vcons" inputmode="decimal" placeholder="18" value="${fv(vo.cons)}"></label><label>Consumo (l/100 km)<input id="vcl100" inputmode="decimal" placeholder="5,6" value="${l100v(vo.cons)}"></label></div>
   <label>Prezzo carburante (€/litro)<input id="vprice" inputmode="decimal" placeholder="1,75" value="${fv(vo.price)}"></label>
   <button class="btn" data-act="saveVeh" data-id="${vo.id}">Salva</button>
-  <h3>Quanto consuma</h3><label>Km da percorrere<input id="ekm" inputmode="decimal" placeholder="100"></label><p class="note" id="estOut" style="margin:0"></p>
   ${rt.length?`<p class="note" style="margin:8px 0 0">Con i tragitti fissi: circa ${eur0(rc)} al mese.</p>`:''}</div>
   ${scadCard(vo)}${fixedCard('Auto',vo.id)}${refuelV(vo)}
   <div class="card"><h2>Spese straordinarie: ${eur2(ex.reduce((a,e)=>a+e.amount,0))}</h2>${ex.map(e=>`<div class="exp"><div class="what">${esc(e.xd||e.cat)}<small>${dfmt(e.date)}${e.pay?' – con '+e.pay:''}</small></div><span class="amt">${eur2(e.amount)}</span></div>`).join('')||'<p class="note" style="margin:0">Attiva “Spesa straordinaria del veicolo” quando registri una spesa.</p>'}</div>`;
@@ -1244,8 +1222,107 @@ function applyRec(silent){
   });
   if(ch)save(silent);
 }
+/* ---------- importazione spese da file CSV ---------- */
+let imp=null;
+const IMPCOLS={date:['data','date','giorno','data operazione','data valuta','data contabile'],amount:['importo','amount','uscita','uscite','spesa','totale','costo','prezzo','euro','dare'],cat:['categoria','category','tipo','tipologia'],note:['nota','note','descrizione','description','causale','dettaglio','esercente'],pay:['pagato con','pagamento','metodo','modalita','metodo di pagamento','conto','strumento']};
+const nrm=x=>String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toLowerCase();
+function csvRows(t){
+  t=t.replace(/^﻿/,'');
+  const first=t.split(/\r?\n/)[0]||'',d=[';','\t',','].map(c=>[c,first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rs=[];let r=[],f='',q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;
+    else if(c===d){r.push(f);f='';}
+    else if(c==='\n'){r.push(f);rs.push(r);r=[];f='';}
+    else if(c!=='\r')f+=c;
+  }
+  if(f!==''||r.length){r.push(f);rs.push(r);}
+  return rs.filter(r=>r.some(x=>String(x).trim()!==''));
+}
+function impDate(v){
+  v=String(v||'').trim().replace(/[T ]\d{1,2}:\d{2}.*$/,'');
+  let y,m,d,x;
+  if(x=v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/)){y=+x[1];m=+x[2];d=+x[3];}
+  else if(x=v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/)){d=+x[1];m=+x[2];y=+x[3];if(y<100)y+=2000;}
+  else return null;
+  const dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d?y+'-'+pad(m)+'-'+pad(d):null;
+}
+function impAmt(v){
+  let t=String(v==null?'':v).replace(/[€\s ]|eur/gi,'');
+  if(!t)return NaN;
+  let neg=false;
+  if(/^\(.*\)$/.test(t)){neg=true;t=t.slice(1,-1);}
+  if(t[0]==='-'){neg=true;t=t.slice(1);}else if(t[0]==='+')t=t.slice(1);
+  if(t.includes(',')&&t.includes('.'))t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');
+  else if(t.includes(','))t=t.replace(',','.');
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  if(!/^\d+(\.\d+)?$/.test(t))return NaN;
+  return (neg?-1:1)*rc(parseFloat(t));
+}
+function impParse(text){
+  const R=csvRows(text);
+  if(R.length<2)return{err:'Il file è vuoto o ha solo l’intestazione.'};
+  const H=R[0].map(nrm),col={};
+  for(const k in IMPCOLS){let j=H.findIndex(h=>IMPCOLS[k].includes(h));if(j<0)j=H.findIndex(h=>IMPCOLS[k].some(a=>a.length>3&&h.includes(a)));if(j>=0&&!Object.values(col).includes(j))col[k]=j;}
+  if(col.date===undefined||col.amount===undefined)return{err:`Non trovo le colonne Data e Importo. Colonne trovate: ${R[0].map(x=>String(x).trim()).filter(Boolean).join(', ')||'nessuna'}. Scarica il modello per vedere il formato.`};
+  const body=R.slice(1),raw=body.map(r=>impAmt(r[col.amount])),nonzero=raw.filter(x=>x!==0&&!isNaN(x)),allNeg=nonzero.length>0&&nonzero.every(x=>x<0);
+  const have=new Set(state.expenses.map(e=>[e.date,e.amount,e.cat,e.note||''].join('|')));
+  const ok=[],bad=[];let dup=0;
+  body.forEach((r,i)=>{
+    const date=impDate(r[col.date]),a=raw[i],line=i+2;
+    if(!date){bad.push(`riga ${line}: data non valida`);return;}
+    if(isNaN(a)){bad.push(`riga ${line}: importo non valido`);return;}
+    const amount=allNeg?-a:a;
+    if(!(amount>0)){bad.push(`riga ${line}: importo ${allNeg?'non negativo':'zero o negativo'}, saltata`);return;}
+    const c0=String(col.cat!==undefined?r[col.cat]:'').trim(),cat=CATS.find(x=>nrm(x)===nrm(c0))||'Altro';
+    let note=String(col.note!==undefined?r[col.note]:'').trim();
+    if(c0&&cat==='Altro'&&nrm(c0)!=='altro')note=note?c0+' – '+note:c0;
+    note=note.slice(0,60);
+    const x={date,amount,cat,note};
+    const pt=nrm(col.pay!==undefined?r[col.pay]:'');
+    const pay=!pt?'':pt.includes('paypal')?'PayPal':pt.includes('contant')||pt.includes('cash')?'Contanti':(pt.includes('carta')||pt.includes('card')||pt.includes('bancomat')||pt.includes('visa')||pt.includes('mastercard'))?'Carta':'';
+    if(pay)x.pay=pay;
+    if(have.has([date,amount,cat,note].join('|'))){dup++;return;}
+    ok.push(x);
+  });
+  return{ok,bad,dup,allNeg,total:rc(ok.reduce((a,x)=>a+x.amount,0))};
+}
+async function impLoad(file){
+  if(!file)return;
+  try{
+    const buf=await file.arrayBuffer();let text;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){text=new TextDecoder('windows-1252').decode(buf);}
+    imp=Object.assign({name:file.name},impParse(text));
+  }catch(e){imp={err:'Non riesco a leggere il file.'};}
+  render();
+}
+function impGo(){
+  if(!imp||!imp.ok||!imp.ok.length)return;
+  const snap=JSON.stringify(state),n=imp.ok.length,t0=Date.now();
+  imp.ok.forEach((x,i)=>state.expenses.push({id:t0+i,...x}));
+  const last=imp.ok.map(x=>x.date).sort().pop();vy=+last.slice(0,4);vm=+last.slice(5,7)-1;sel=null;
+  imp=null;save();render();
+  showToast(`Importate ${n} spese`,'Annulla',()=>{state=JSON.parse(snap);save();render();});
+}
+function impCard(){
+  const r=imp,head=`<h2>Importa spese da CSV</h2>`;
+  const base=`<p class="note" style="margin-top:0">Carica un file CSV (anche esportato da Excel) con almeno le colonne <strong>Data</strong> e <strong>Importo</strong>. Facoltative: Categoria, Nota, Pagato con. Le spese già presenti, identiche per data, importo, categoria e nota, vengono saltate.</p>`;
+  const btns=`<div class="row"><button class="btn" data-act="imppick">Scegli file CSV</button><button class="btn sec" data-act="impmodel">Scarica modello</button></div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" hidden>`;
+  if(!r)return `<div class="card">${head}${base}${btns}</div>`;
+  if(r.err)return `<div class="card">${head}<div class="msg" role="alert">${esc(r.err)}</div>${btns}</div>`;
+  const ex=r.ok.slice(0,5).map(x=>`<div class="exp">${catIco(x.cat)}<div class="what">${esc(x.cat)}<small>${dfmt(x.date)}${x.note?' – '+esc(x.note):''}${x.pay?' – '+x.pay:''}</small></div><span class="amt">${eur2(x.amount)}</span></div>`).join('');
+  return `<div class="card">${head}<p style="margin:0 0 6px"><strong>${esc(r.name)}</strong>: ${r.ok.length} ${r.ok.length===1?'spesa pronta':'spese pronte'} per un totale di <strong>${eur2(r.total)}</strong>.</p>
+  ${r.allNeg?'<p class="note" style="margin:0 0 6px">Gli importi del file sono negativi: li ho letti come spese.</p>':''}
+  ${r.dup?`<p class="note" style="margin:0 0 6px">${r.dup} già presenti: saltate.</p>`:''}
+  ${r.bad.length?`<p class="note" style="margin:0 0 6px">${r.bad.length} righe non importabili (${esc(r.bad.slice(0,3).join('; '))}${r.bad.length>3?'…':''}).</p>`:''}
+  ${ex}${r.ok.length>5?`<p class="note" style="margin:6px 0 0">…e altre ${r.ok.length-5}.</p>`:''}
+  <div class="row" style="margin-top:12px"><button class="btn sec" data-act="impcancel">Annulla</button>${r.ok.length?`<button class="btn" data-act="impgo">Importa ${r.ok.length}</button>`:'<button class="btn" data-act="imppick">Scegli un altro file</button>'}</div><input type="file" id="impfile" accept=".csv,text/csv,text/plain" hidden></div>`;
+}
 function viewImpostazioni(){
-  return `${entrateCard()}${zeroCard()}${featCard()}
+  return `${entrateCard()}${zeroCard()}${featCard()}${impCard()}
 
   <h3>Utente</h3><div class="card"><p style="margin:0 0 6px">Stai usando l’app come <strong>${esc(user.nome+' '+user.cognome)}</strong>.</p><button class="link" data-act="switchUser" style="padding:0">Non sei tu? Cambia utente</button></div>
   <h3>Backup e dati</h3><div class="card"><p class="note" style="margin-top:0">${persisted===true?'<strong>Archiviazione protetta:</strong> il browser non cancella i dati da solo. ':persisted===false?'<strong>Archiviazione non protetta:</strong> il browser può cancellare i dati se manca spazio o non apri l’app per un po’. Aggiungila alla Home e scarica il backup ogni tanto. ':''}I dati sono salvati in questo browser come file CSV. Se cancelli i dati del browser vanno persi: scarica il backup ogni tanto. Il tuo utilizzo dell’app (quando la apri, quali schede usi, tipo di operazione e categoria, senza importi né descrizioni) viene inviato a chi gestisce il test.</p><div class="row"><button class="btn" data-act="expAll">Scarica backup (CSV)</button><button class="btn sec" data-act="expEvents">Dati d’uso</button></div></div>`;
@@ -1256,7 +1333,7 @@ function viewGuida(){
   const s=(t,l)=>`<div class="card"><h2>${t}</h2><ul class="rules">${l.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
   return (feat('check')?`<button class="btn" data-tab="check" style="margin-bottom:16px">Controllo guidato: verifica e sistema</button>`:'')+
   s('Come muoverti',['La barra in basso ha le cinque sezioni principali: Oggi, Spese, Anno, Mensili, Conti.','Il pulsante con le tue iniziali, in alto a destra, apre il menu: Sfide, Prima di comprare, Fumo (se attivo), Controllo guidato, Guida e Impostazioni.'])+
-  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Sotto il riquadro in alto trovi “Settimana e mese”: quanto hai speso in settimana rispetto alla quota, il ritmo del mese e la media dei mesi passati.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
+  s('Oggi',['Il pulsante + in basso a destra aggiunge una spesa in due passaggi: importo e categoria. Giorno, nota e modo di pagamento sono facoltativi.','In alto vedi quanto puoi ancora spendere oggi. Le frecce cambiano mese.','Tocca un giorno del calendario: vedi il limite di quel giorno, le spese e i movimenti dei conti, in verde o rosso.','Il modulo aggiunge una spesa nel giorno scelto: importo, giorno, pagato con, categoria e nota.','“Opzioni” apre: diviso con amici (persone, quanto ha dato ognuno, come ha rimborsato), rifornimento, spesa straordinaria, spostamento in auto con km.','Le frecce in fondo al riquadro cambiano giorno senza tornare in alto.','Il riquadro in alto distingue il budget settimanale (lunedì–domenica) e il budget mensile: per ognuno vedi speso, quota e quanto resta.','La panoramica mostra entrate, risparmio, spese fisse e variabili.','“Valuta un acquisto”: prima di comprare inserisci cosa e quanto costa. L’app valuta l’impatto sul budget e ti consiglia se comprare, rimandare o evitare. I rimandati tornano quando scade il tempo.'])+
   s('Spese',['Scegli Mese o Anno per vedere dove vanno i soldi. Tocca una categoria per vedere tutte le sue spese, mese per mese.','Modifica ed Elimina sono accanto a ogni spesa. Dopo un’eliminazione hai alcuni secondi per annullare.'])+
   s('Anno',['Grafico dei 12 mesi con il budget e risparmio dei mesi conclusi. Tocca un mese per aprirlo. Le categorie dell’anno sono nella scheda Spese, scegliendo Anno.'])+
   s('Mensili',['Casa: affitto o mutuo, bollette, internet e telefono. Inseriscile per prime: l’app stima quanto puoi risparmiare e da dove limare.','Veicoli: consumo in km/l e l/100 km, spese fisse, rifornimenti con km previsti, spese straordinarie, scadenze di assicurazione (durata e sospensione) e bollo.','Tragitti: i percorsi fissi con il veicolo usato. Puoi scegliere se la stima entra nel budget.','Abbonamenti: importi al mese. Tutte le spese fisse abbassano il limite giornaliero.'])+
@@ -1663,6 +1740,10 @@ document.addEventListener('click',e=>{
   }else if(a==='nowY'){ay=new Date().getFullYear();render();
   }else if(a==='gotoM'){
     vy=ay;vm=parseInt(t.dataset.m,10);sel=null;editId=null;tab='oggi';render();window.scrollTo(0,0);
+  }else if(a==='imppick'){const el=document.getElementById('impfile');if(el){el.value='';el.click();}
+  }else if(a==='impmodel'){dl('modello-import-spese.csv','\uFEFFData;Importo;Categoria;Nota;Pagato con\n01/11/2026;12,50;Spesa;Pane e latte;Carta\n02/11/2026;8,00;Uscite e svago;Caffè;Contanti\n');
+  }else if(a==='impgo'){impGo();
+  }else if(a==='impcancel'){imp=null;render();
   }else if(a==='expEvents'){exportEvents();
   }else if(a==='expAll'){exportAll();
   }else if(a==='switchUser'){switchUser();
@@ -1718,9 +1799,9 @@ app.addEventListener('input',e=>{
   const id=e.target.id,pair={cons:'cl100',cl100:'cons',ccons:'ccl100',ccl100:'ccons',vcons:'vcl100',vcl100:'vcons'}[id];
   if(pair){const v=num(e.target.value);document.getElementById(pair).value=v>0?String(Math.round(100/v*100)/100).replace('.',','):'';}
   if(['amt','ppl','km','cons','cl100','price','rbamt'].includes(id)||/^fa\d+$/.test(id))updQuota();
-  if(['ekm','vcons','vcl100','vprice'].includes(id))updEst();
 });
 app.addEventListener('change',e=>{
+  if(e.target.id==='impfile'){impLoad(e.target.files&&e.target.files[0]);return;}
   if(e.target.dataset&&e.target.dataset.feat){state.feat=Object.assign({sfide:1,compra:1,check:1},state.feat||{});state.feat[e.target.dataset.feat]=e.target.checked?1:0;save();render();return;}
   if(e.target.id==='smon'){state.smoke=state.smoke||{};state.smoke.on=e.target.checked;save();render();return;}
   if(e.target.dataset.ch){const k=e.target.dataset.ch;state.ch=state.ch||{};if(e.target.checked)state.ch[k]={e:parseFloat(e.target.dataset.e)||0,d:e.target.dataset.d};else delete state.ch[k];save();render();return;}
