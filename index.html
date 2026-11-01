@@ -735,22 +735,9 @@ function monthOv(c){
   return `<div class="card"><h2>Panoramica del mese</h2>${row('Entrate'+(r===null?' (previste)':' (registrate)'),'+'+eur2(inc),'var(--ok)')}${row('Obiettivo di risparmio',(state.goal>0?'−':'')+eur2(state.goal))}${row('Spese fisse<small>'+eur0(ft-(state.noRoutes?0:routesTot()))+' di voci fisse'+(state.noRoutes?'':', '+eur0(routesTot())+' di carburante dei tragitti')+'</small>',(ft>0?'−':'')+eur2(ft))}${row('Spese variabili',(c.spent>0?'−':'')+eur2(c.spent))}${row('<strong>Rimane</strong>',eur2(rest),rest>=0?'var(--ok)':'var(--bad)')}</div>`;
 }
 
-function dayPanel(c){
-  const ds=c.mk+'-'+pad(sel);
-  const items=c.exp.filter(e=>e.date===ds);
-  const dayTot=items.reduce((a,e)=>a+e.amount,0);
-  const ed=editId?state.expenses.find(x=>x.id===editId):null;
-  const sp=!!(ed&&ed.people>1);
-  const tr=!!(ed&&ed.km>0);
-  const full=!!ed||detail;
-  const cr=car();
-  const short=new Date(c.y,c.m,sel).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
-  const title=new Date(c.y,c.m,sel).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
-  const rows=items.map(e=>`<div class="exp">${catIco(e.cat)}<div class="what">${esc(e.cat)}${sub(e)?`<small>${sub(e)}</small>`:''}</div><span class="amt">${eur2(e.amount)}</span>${actBtns(e.id)}</div>`).join('');
-  return `<div class="card" id="daycard"><h2 style="text-transform:capitalize">${title}</h2>${dayInfo(c)}${dayMoves(ds)}
-  ${items.length?`<p class="note" style="margin:-4px 0 8px">Totale del giorno: <strong>${eur2(dayTot)}</strong></p>${rows}`:'<p class="note" style="margin:0 0 8px">Nessuna spesa in questo giorno.</p>'}
-  ${full?`<h3>${ed?'Modifica spesa':'Aggiungi una spesa'}</h3>
-  <div class="msg" id="err" role="alert" hidden></div>
+function expForm(ed,ds){
+  const sp=!!(ed&&ed.people>1),tr=!!(ed&&ed.km>0),cr=car();
+  return `  <div class="msg" id="err" role="alert" hidden></div>
   <label><span id="amtLbl">${sp?'Importo totale del conto (€)':'Importo (€)'}</span><input id="amt" inputmode="decimal" placeholder="0,00" value="${ed?String(sp?ed.total:ed.amount).replace('.',','):''}"></label>
   <label>Giorno<input id="dt" type="date" value="${ds}"></label>
   <label>Pagato con<select id="pay">${['',...PAYS].map(x=>`<option value="${x}"${((ed?ed.pay:state.lastPay)||'')===x?' selected':''}>${x||'Non indicato'}</option>`).join('')}</select></label>
@@ -776,7 +763,51 @@ function dayPanel(c){
   <p class="note" id="fuelOut" style="margin:-2px 0 10px"></p></div>
   </details>
   <button class="btn" data-act="add">${ed?'Salva modifica':'Aggiungi spesa'}</button>
-  ${ed||detail?'<button class="link" data-act="cancelEdit">Annulla</button>':''}`:`<p class="note" style="margin:0 0 8px">Tocca <strong>+</strong> per aggiungere una spesa a questo giorno.</p>`}
+  <button class="link" data-act="cancelEdit">Annulla</button>`;
+}
+
+let qaClose=null;
+const closeSheet=()=>{if(qaClose)qaClose();};
+function expSheet(ed,ds,pre){
+  closeSheet();
+  const ov=document.createElement('div');ov.className='ov sheet';ov.id='qasheet';
+  ov.innerHTML=`<div class="card dlg" role="dialog" aria-modal="true" aria-labelledby="qaT"><h2 id="qaT">${ed?'Modifica spesa':'Nuova spesa'}</h2>${expForm(ed,ds)}</div>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);qaClose=null;editId=null;};
+  const onKey=e=>{if(e.key==='Escape')close();};
+  document.addEventListener('keydown',onKey);
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});
+  qaClose=close;
+  ov.addEventListener('input',e=>{
+    const id=e.target.id,pair={cons:'cl100',cl100:'cons'}[id];
+    if(pair){const v=num(e.target.value);document.getElementById(pair).value=v>0?String(Math.round(100/v*100)/100).replace('.',','):'';}
+    if(['amt','ppl','km','cons','cl100','price','rbamt'].includes(id)||/^fa\d+$/.test(id))updQuota();
+  });
+  ov.addEventListener('change',e=>{
+    if(['split','trip','fsplit','refuel','extra'].includes(e.target.id)){updQuota();return;}
+    if(e.target.id==='vsel'){const v=vById(parseInt(e.target.value,10));if(!editId){document.getElementById('cons').value=fv(v.cons);document.getElementById('cl100').value=l100v(v.cons);document.getElementById('price').value=fv(v.price);}updQuota();}
+  });
+  if(pre){const set=(i,v)=>{const el=ov.querySelector('#'+i);if(el&&v!==undefined&&v!==null)el.value=v;};set('amt',pre.amt);set('cat',pre.cat);set('note',pre.note);set('pay',pre.pay);}
+  if(pre){const d=ov.querySelector('details.opts');if(d)d.open=true;}
+  updQuota();
+  setTimeout(()=>{const el=ov.querySelector('#amt');if(el)el.focus();},60);
+}
+
+function dayPanel(c){
+  const ds=c.mk+'-'+pad(sel);
+  const items=c.exp.filter(e=>e.date===ds);
+  const dayTot=items.reduce((a,e)=>a+e.amount,0);
+  const ed=editId?state.expenses.find(x=>x.id===editId):null;
+  const sp=!!(ed&&ed.people>1);
+  const tr=!!(ed&&ed.km>0);
+  const full=!!ed||detail;
+  const cr=car();
+  const short=new Date(c.y,c.m,sel).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
+  const title=new Date(c.y,c.m,sel).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+  const rows=items.map(e=>`<div class="exp">${catIco(e.cat)}<div class="what">${esc(e.cat)}${sub(e)?`<small>${sub(e)}</small>`:''}</div><span class="amt">${eur2(e.amount)}</span>${actBtns(e.id)}</div>`).join('');
+  return `<div class="card" id="daycard"><h2 style="text-transform:capitalize">${title}</h2>${dayInfo(c)}${dayMoves(ds)}
+  ${items.length?`<p class="note" style="margin:-4px 0 8px">Totale del giorno: <strong>${eur2(dayTot)}</strong></p>${rows}`:'<p class="note" style="margin:0 0 8px">Nessuna spesa in questo giorno.</p>'}
+  <p class="note" style="margin:0 0 8px">Tocca <strong>+</strong> per aggiungere una spesa a questo giorno.</p>
   <div class="daybar"><button class="nbtn" data-act="prevD" aria-label="Giorno precedente">${IC.l}</button><span>${short}</span><button class="nbtn" data-act="nextD" aria-label="Giorno successivo">${IC.r}</button></div></div>`;
 }
 
@@ -1351,10 +1382,8 @@ function quickAdd(){
   $('qaok').onclick=ok;
   $('qamt').addEventListener('keydown',e=>{if(e.key==='Enter')ok();});
   $('qamore').onclick=()=>{
-    const a=$('qamt').value,d=/^\d{4}-\d{2}-\d{2}$/.test($('qdt').value)?$('qdt').value:ds;
-    close();go(d);tab='oggi';detail=true;editId=null;render();
-    const el=document.getElementById('amt');if(el&&a)el.value=a;
-    const dc=document.getElementById('daycard');if(dc)dc.scrollIntoView({block:'start'});
+    const pre={amt:$('qamt').value,cat,note:$('qnote').value,pay:$('qpay').value},d=/^\d{4}-\d{2}-\d{2}$/.test($('qdt').value)?$('qdt').value:ds;
+    close();expSheet(null,d,pre);
   };
   setTimeout(()=>$('qamt').focus(),60);
 }
@@ -1452,7 +1481,7 @@ document.addEventListener('click',e=>{
       if(vh&&(rf||ex||isTrip))x.veh=vh;
       state.expenses.push(x);
     }
-    save();render();
+    closeSheet();save();render();
   }else if(a==='del'){
     if(String(editId)===t.dataset.id)editId=null;
     const did=t.dataset.id;softDelete('Spesa eliminata',()=>{state.expenses=state.expenses.filter(x=>String(x.id)!==did);});
@@ -1462,11 +1491,10 @@ document.addEventListener('click',e=>{
   }else if(a==='edit'){
     const x=state.expenses.find(z=>String(z.id)===t.dataset.id);
     if(x){
-      editId=x.id;vy=parseInt(x.date.slice(0,4),10);vm=parseInt(x.date.slice(5,7),10)-1;sel=parseInt(x.date.slice(8),10);tab='oggi';render();
-      const dc=document.getElementById('daycard');if(dc)dc.scrollIntoView({block:'center'});
+      editId=x.id;expSheet(x,x.date);
     }
   }else if(a==='cancelEdit'){detail=false;
-    editId=null;render();
+    closeSheet();editId=null;render();
   }else if(a==='prevD'||a==='nextD'){
     const d=new Date(vy,vm,sel+(a==='nextD'?1:-1));
     vy=d.getFullYear();vm=d.getMonth();sel=d.getDate();editId=null;render();
