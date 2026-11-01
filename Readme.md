@@ -1,7 +1,7 @@
 # 📝 La mia To-Do List
 
 ## 🔴 Da fare
-- [ ] Fare la spesa OK
+- [x] Fare la spesa OK
 - [ ] Studiare Markdown
 - [ ] Allenarsi in palestra
 - [ ] Rispondere alle email
