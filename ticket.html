@@ -2,101 +2,127 @@
 <html lang="it" class="dark">
 <head>
     <meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=8d23f308-542c-45e8-b1de-6c9b76d87362
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Issue & Problem Tracker Pro</title>
+    <title>Issue Tracker Collaborativo - Firebase</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase App & Firestore SDKs v9 (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: { extend: { colors: { primary: '#4f46e5' } } }
         }
     </script>
-    <!-- Firebase App & Firestore SDKs v9 (Compat) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen transition-colors duration-200">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200">
 
-    <div class="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
-        <!-- Header Professionale -->
-        <header class="flex flex-col sm:flex-row justify-between items-center mb-8 bg-gray-800 border border-gray-700 p-5 rounded-2xl shadow-lg gap-4">
-            <div class="flex items-center gap-3">
-                <div class="p-3 bg-primary/20 text-primary rounded-xl text-xl">🚀</div>
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Issue & Problem Tracker</h1>
-                    <p class="text-xs text-gray-400">Piattaforma collaborativa in tempo reale</p>
-                </div>
+    <div class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center gap-2">
+                    📋 Issue & Problem Tracker
+                </h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Segnala, prendi in carico e risolvi le problematiche in tempo reale.</p>
             </div>
             <div class="flex items-center gap-3">
-                <div class="text-xs bg-gray-700/60 border border-gray-600 px-3 py-2 rounded-xl font-medium flex items-center gap-2">
-                    👤 <span id="current-username" class="font-bold text-indigo-400">Ospite</span>
-                    <button onclick="changeUsername()" class="text-xs text-indigo-400 underline ml-1 hover:text-indigo-300">Modifica</button>
+                <div class="text-sm bg-indigo-50 dark:bg-gray-700 px-3 py-1.5 rounded-lg font-medium flex items-center gap-2">
+                    👤 <span id="current-username">Ospite</span>
+                    <button onclick="changeUsername()" class="text-xs text-primary dark:text-indigo-300 underline ml-1 hover:text-indigo-700">Modifica</button>
                 </div>
-                <button onclick="toggleDarkMode()" class="p-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 border border-gray-600 text-sm">
-                    🌙 / ☀️
-                </button>
+                <button onclick="toggleDarkMode()" id="theme-btn" title="Cambia tema" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">☀️</button>
             </div>
         </header>
 
-        <!-- Form Nuova Segnalazione (Finestra) -->
-        <section class="bg-gray-800 border border-gray-700 p-6 rounded-2xl shadow-lg mb-8">
-            <h2 class="text-md font-semibold mb-4 flex items-center gap-2 text-indigo-400">
-                ➕ Nuova Segnalazione Problema
-            </h2>
-            <form id="issue-form" onsubmit="addIssue(event)" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Titolo del problema</label>
-                        <input type="text" id="issue-title" required placeholder="Es. Disservizio audio mixer principale" class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Categoria</label>
-                        <input type="text" id="issue-category" placeholder="Es. Audio, Luci, Rete" class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none">
-                    </div>
+        <!-- Riepilogo -->
+        <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Totali</p>
+                <p id="stat-total" class="text-2xl font-bold mt-1">0</p>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-yellow-400">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Aperte</p>
+                <p id="stat-open" class="text-2xl font-bold mt-1 text-yellow-600 dark:text-yellow-400">0</p>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-indigo-500">
+                <p class="text-xs uppercase tracking-wider text-gray-400">In corso</p>
+                <p id="stat-progress" class="text-2xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">0</p>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Risolte</p>
+                <p id="stat-resolved" class="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">0</p>
+            </div>
+        </section>
+
+        <!-- Form Nuova Segnalazione -->
+        <details class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 group" open>
+            <summary class="cursor-pointer select-none p-5 text-lg font-semibold flex items-center justify-between">
+                <span>➕ Nuova Segnalazione</span>
+                <span class="text-sm text-gray-400 group-open:rotate-180 transition">▾</span>
+            </summary>
+            <form id="issue-form" onsubmit="addIssue(event)" class="space-y-4 px-5 pb-5">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Titolo del problema</label>
+                    <input type="text" id="issue-title" required placeholder="Es. Guasto impianto audio sala 2" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Descrizione dettagliata</label>
-                    <textarea id="issue-desc" rows="2" required placeholder="Fornisci dettagli sul problema riscontrato..." class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none"></textarea>
+                    <label class="block text-sm font-medium mb-1">Descrizione dettagliata</label>
+                    <textarea id="issue-desc" rows="3" required placeholder="Descrivi cosa sta succedendo..." class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:outline-none"></textarea>
                 </div>
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div class="w-full sm:w-1/3">
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Priorità</label>
-                        <select id="issue-priority" class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Priorità</label>
+                        <select id="issue-priority" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:outline-none">
                             <option value="Bassa">Bassa</option>
                             <option value="Media" selected>Media</option>
                             <option value="Alta">Alta</option>
                             <option value="Urgente">Urgente</option>
                         </select>
                     </div>
-                    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition shadow-lg mt-auto">
-                        Pubblica Segnalazione
-                    </button>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Categoria</label>
+                        <input type="text" id="issue-category" placeholder="Es. Audio/Video, Elettrico..." class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:outline-none">
+                    </div>
                 </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2">
+                    🚀 Segnala Problematica
+                </button>
             </form>
-        </section>
+        </details>
 
-        <!-- Filtri e Ricerca -->
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-            <div class="flex gap-2 w-full sm:w-auto">
-                <button onclick="setFilter('all')" id="filter-all" class="px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl bg-indigo-600 text-white shadow">Tutti</button>
-                <button onclick="setFilter('active')" id="filter-active" class="px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700">Aperti</button>
-                <button onclick="setFilter('resolved')" id="filter-resolved" class="px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700">Risolti</button>
-            </div>
-            <div class="w-full sm:w-72">
-                <input type="text" id="search-input" oninput="renderIssues()" placeholder="Cerca tra le task..." class="w-full px-3.5 py-2 bg-gray-800 border border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+        <!-- Schede e Ricerca -->
+        <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-4">
+            <nav class="flex p-1 bg-gray-200/70 dark:bg-gray-800 rounded-xl gap-1 w-full md:w-auto">
+                <button onclick="setFilter('all')" id="filter-all" class="tab-btn"></button>
+                <button onclick="setFilter('active')" id="filter-active" class="tab-btn"></button>
+                <button onclick="setFilter('resolved')" id="filter-resolved" class="tab-btn"></button>
+            </nav>
+            <div class="flex gap-2 w-full md:w-auto">
+                <select id="priority-filter" onchange="renderIssues()" class="px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">Tutte le priorità</option>
+                    <option>Urgente</option><option>Alta</option><option>Media</option><option>Bassa</option>
+                </select>
+                <input type="text" id="search-input" oninput="renderIssues()" placeholder="Cerca problema..." class="flex-1 md:w-64 px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
             </div>
         </div>
 
-        <!-- Lista Problematiche (Finestre Task) -->
-        <div id="issues-container" class="space-y-4">
-            <div class="text-center py-12 text-gray-500">Connessione al database in corso...</div>
+        <!-- Intestazione della vista -->
+        <div id="view-header" class="mb-4"></div>
+
+        <!-- Lista Problematiche -->
+        <div id="issues-container">
+            <div class="text-center py-12 text-gray-400">Connessione a Firebase in corso...</div>
         </div>
     </div>
 
-    <!-- Script Firebase & Logica Professionale -->
+    <!-- Script Firebase & Logica App -->
     <script>
-        // LE TUE CHIAVI DI FIREBASE
+        // LE TUE CHIAVI ESATTE DI FIREBASE
         const firebaseConfig = {
             apiKey: "AiZaSyDalJfeeoqKeFoYL0whEnJNII2-x9L2AT4",
             authDomain: "simplify-9e4d8.firebaseapp.com",
@@ -107,16 +133,37 @@
             measurementId: "G-R3S9MHJBW4"
         };
 
+        // Inizializza Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         let currentUser = localStorage.getItem('tracker_username') || '';
         let currentFilter = 'all';
         let issuesCache = [];
+        let loaded = false;
+        const expanded = new Set();   // righe aperte nella vista "Tutti"
+        const drafts = {};            // bozze delle note non ancora salvate
+        const pendingShots = {};      // screenshot allegati alla nota in scrittura, per segnalazione
+        const uploading = new Set();  // segnalazioni con una nota in fase di invio
+
+        const MAX_SHOTS = 6;
+        const UPLOAD_LIMIT = 4 * 1024 * 1024;
+        const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+        const STATUS_LABEL = { 'Aperta': 'Aperta', 'In carico': 'In corso', 'Risolta': 'Risolta' };
+        const PRIORITY_ORDER = { 'Urgente': 0, 'Alta': 1, 'Media': 2, 'Bassa': 3 };
+
+        function esc(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function nowString() {
+            return new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+        }
 
         function checkUser() {
             if (!currentUser) {
-                currentUser = prompt("Inserisci il tuo nome operatore:", "Tecnico") || "Ospite";
+                currentUser = prompt("Inserisci il tuo nome per iniziare:", "Operatore") || "Ospite";
                 localStorage.setItem('tracker_username', currentUser);
             }
             document.getElementById('current-username').innerText = currentUser;
@@ -132,33 +179,47 @@
         }
 
         function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.getElementById('theme-btn').innerText = isDark ? '☀️' : '🌙';
         }
 
-        // Sincronizzazione in tempo reale con Firestore
+        // Ascolto in tempo reale da Firestore
         db.collection("issues").orderBy("createdAt", "desc").onSnapshot((snapshot) => {
             issuesCache = [];
             snapshot.forEach((doc) => {
                 issuesCache.push({ id: doc.id, ...doc.data() });
             });
+            loaded = true;
             renderIssues();
         }, (error) => {
             console.error("Errore Firestore:", error);
             document.getElementById('issues-container').innerHTML = `
-                <div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-400 text-center text-sm">
-                    <p class="font-bold">Errore di connessione / Permessi database</p>
-                    <p class="mt-1">Verifica di aver impostato le regole su Firebase Console su "allow read, write: if true;"</p>
+                <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 p-4 rounded-xl text-red-600 dark:text-red-400 text-center">
+                    <p class="font-bold">Errore di permessi o connessione al database</p>
+                    <p class="text-sm mt-1">Ricordati di impostare le regole su Firebase Console -> Firestore Database -> Regole su "allow read, write: if true;"</p>
                 </div>`;
         });
+
+        // Voce di cronologia: type 'note' per i commenti, 'status' per i cambi di stato
+        function logEntry(text, type = 'note') {
+            return { author: currentUser, text, type, timestamp: nowString(), at: Date.now() };
+        }
+
+        function touch() {
+            return {
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastActivity: `${currentUser} · ${nowString()}`
+            };
+        }
 
         function addIssue(e) {
             e.preventDefault();
             checkUser();
 
-            const title = document.getElementById('issue-title').value;
-            const description = document.getElementById('issue-desc').value;
+            const title = document.getElementById('issue-title').value.trim();
+            const description = document.getElementById('issue-desc').value.trim();
             const priority = document.getElementById('issue-priority').value;
-            const category = document.getElementById('issue-category').value || 'Generale';
+            const category = document.getElementById('issue-category').value.trim() || 'Generale';
 
             db.collection("issues").add({
                 title,
@@ -169,170 +230,497 @@
                 author: currentUser,
                 assignee: '',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                displayDate: new Date().toLocaleString(),
-                notes: []
+                displayDate: nowString(),
+                notes: [logEntry('Segnalazione creata', 'status')],
+                ...touch()
             }).then(() => {
                 document.getElementById('issue-form').reset();
             }).catch((err) => {
-                alert("Errore: " + err.message);
+                alert("Errore durante il salvataggio: " + err.message);
             });
         }
 
         function updateStatus(id, newStatus) {
             checkUser();
-            const updateData = { status: newStatus };
+            const updateData = { status: newStatus, ...touch() };
+            let message = `Stato cambiato in "${STATUS_LABEL[newStatus]}"`;
+
             if (newStatus === 'In carico') {
                 updateData.assignee = currentUser;
+                message = 'Ha preso in carico la segnalazione';
+            } else if (newStatus === 'Risolta') {
+                const resolution = prompt("Nota di risoluzione (facoltativa): cosa è stato fatto?");
+                if (resolution === null) return;
+                updateData.resolvedBy = currentUser;
+                updateData.resolvedAt = nowString();
+                updateData.resolution = resolution.trim();
+                message = resolution.trim() ? `Segnata come risolta: ${resolution.trim()}` : 'Segnata come risolta';
+            } else if (newStatus === 'Aperta') {
+                updateData.assignee = '';
+                updateData.resolvedBy = '';
+                updateData.resolvedAt = '';
+                updateData.resolution = '';
+                message = 'Segnalazione riaperta';
             }
+
+            updateData.notes = firebase.firestore.FieldValue.arrayUnion(logEntry(message, 'status'));
             db.collection("issues").doc(id).update(updateData);
         }
 
-        // Funzione per aggiungere nota con supporto opzionale a Screenshot (File o Incolla)
-        function addNoteWithImage(id) {
+        function releaseIssue(id) {
             checkUser();
-            const noteText = prompt("Scrivi il testo della nota o aggiornamento tecnico:");
-            if (noteText === null) return;
-
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(uploadEvent) {
-                        saveNoteToFirestore(id, noteText, uploadEvent.target.result);
-                    };
-                    reader.readAsDataURL(file);
-                } else {
-                    saveNoteToFirestore(id, noteText, null);
-                }
-            };
-            
-            // Chiede se si vuole allegare uno screenshot
-            if (confirm("Vuoi allegare uno screenshot o un'immagine a questa nota?\n[OK] = Sì, seleziona immagine | [Annulla] = Solo testo")) {
-                input.click();
-            } else {
-                saveNoteToFirestore(id, noteText, null);
-            }
-        }
-
-        function saveNoteToFirestore(id, text, imageBase64) {
-            const newNote = {
-                author: currentUser,
-                text: text || "Aggiornamento",
-                image: imageBase64 || null,
-                timestamp: new Date().toLocaleString()
-            };
-
             db.collection("issues").doc(id).update({
-                notes: firebase.firestore.FieldValue.arrayUnion(newNote)
+                status: 'Aperta',
+                assignee: '',
+                notes: firebase.firestore.FieldValue.arrayUnion(logEntry('Ha rilasciato la presa in carico', 'status')),
+                ...touch()
             });
         }
 
+        // --- Screenshot allegati alle note ---
+
+        // Ridimensiona le immagini troppo pesanti prima dell'invio
+        async function prepareImage(file) {
+            if (file.size <= UPLOAD_LIMIT && IMAGE_TYPES.includes(file.type)) return file;
+            const bitmap = await createImageBitmap(file);
+            let scale = Math.min(1, 2560 / Math.max(bitmap.width, bitmap.height));
+            for (let quality = 0.85; ; quality -= 0.15, scale *= 0.8) {
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(bitmap.width * scale);
+                canvas.height = Math.round(bitmap.height * scale);
+                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', Math.max(quality, 0.4)));
+                if (blob.size <= UPLOAD_LIMIT || quality < 0.4) return blob;
+            }
+        }
+
+        function addShots(id, files) {
+            const images = [...files].filter(f => f.type && f.type.startsWith('image/'));
+            if (!images.length) return;
+            const list = pendingShots[id] = pendingShots[id] || [];
+            for (const file of images) {
+                if (list.length >= MAX_SHOTS) { alert(`Puoi allegare al massimo ${MAX_SHOTS} screenshot per nota.`); break; }
+                list.push({ file, name: file.name || 'screenshot.png', preview: URL.createObjectURL(file) });
+            }
+            renderShotTray(id);
+        }
+
+        function removeShot(id, index) {
+            const list = pendingShots[id] || [];
+            const [removed] = list.splice(index, 1);
+            if (removed) URL.revokeObjectURL(removed.preview);
+            if (!list.length) delete pendingShots[id];
+            renderShotTray(id);
+        }
+
+        function clearShots(id) {
+            (pendingShots[id] || []).forEach(s => URL.revokeObjectURL(s.preview));
+            delete pendingShots[id];
+        }
+
+        function shotTrayHtml(id) {
+            const list = pendingShots[id] || [];
+            if (!list.length) return '';
+            return `<div class="flex flex-wrap gap-2 mt-2">` + list.map((s, i) => `
+                <div class="relative group">
+                    <img src="${s.preview}" alt="${esc(s.name)}" class="w-20 h-20 object-cover rounded-lg border dark:border-gray-600">
+                    <button type="button" onclick="removeShot('${id}', ${i})" title="Rimuovi"
+                        class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-5 text-center shadow">×</button>
+                </div>`).join('') + `</div>`;
+        }
+
+        function renderShotTray(id) {
+            const tray = document.getElementById(`shots-${id}`);
+            if (tray) tray.innerHTML = shotTrayHtml(id);
+        }
+
+        function notePaste(e, id) {
+            const files = [...(e.clipboardData?.files || [])];
+            if (files.some(f => f.type.startsWith('image/'))) {
+                e.preventDefault();
+                addShots(id, files);
+            }
+        }
+
+        function noteDrop(e, id) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+            addShots(id, e.dataTransfer.files);
+        }
+
+        async function uploadShot(shot) {
+            const body = await prepareImage(shot.file);
+            const res = await fetch('/api/screenshots', {
+                method: 'POST',
+                headers: { 'content-type': body.type || 'image/png' },
+                body
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `Caricamento non riuscito (${res.status})`);
+            return { url: data.url, name: shot.name };
+        }
+
+        function openShot(url) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox-open').href = url;
+            document.getElementById('lightbox').classList.remove('hidden');
+        }
+
+        function closeShot() {
+            document.getElementById('lightbox').classList.add('hidden');
+            document.getElementById('lightbox-img').src = '';
+        }
+
+        async function addNote(id) {
+            checkUser();
+            if (uploading.has(id)) return;
+            const field = document.getElementById(`note-${id}`);
+            const noteText = (field ? field.value : '').trim();
+            const shots = pendingShots[id] || [];
+            if (!noteText && !shots.length) {
+                if (field) field.focus();
+                return;
+            }
+
+            uploading.add(id);
+            renderIssues();
+            try {
+                const attachments = await Promise.all(shots.map(uploadShot));
+                const entry = logEntry(noteText);
+                if (attachments.length) entry.attachments = attachments;
+                await db.collection("issues").doc(id).update({
+                    notes: firebase.firestore.FieldValue.arrayUnion(entry),
+                    ...touch()
+                });
+                delete drafts[id];
+                clearShots(id);
+                const f = document.getElementById(`note-${id}`);
+                if (f) f.value = '';
+            } catch (err) {
+                alert("Errore durante il salvataggio della nota: " + err.message);
+            } finally {
+                uploading.delete(id);
+                renderIssues();
+            }
+        }
+
+        function noteKeydown(e, id) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                addNote(id);
+            }
+        }
+
         function deleteIssue(id) {
-            if (confirm("Sei sicuro di voler eliminare definitivamente questa task?")) {
+            if (confirm("Sei sicuro di voler eliminare questa segnalazione dal database?")) {
                 db.collection("issues").doc(id).delete();
             }
         }
 
+        function toggleRow(id) {
+            expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+            renderIssues();
+        }
+
         function setFilter(filter) {
             currentFilter = filter;
-            ['all', 'active', 'resolved'].forEach(f => {
-                const btn = document.getElementById(`filter-${f}`);
-                if (f === filter) {
-                    btn.className = "px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl bg-indigo-600 text-white shadow";
-                } else {
-                    btn.className = "px-4 py-2 text-xs font-semibold uppercase tracking-wider rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700";
-                }
-            });
             renderIssues();
+        }
+
+        // ---------- Rendering ----------
+
+        function priorityBadge(p) {
+            let c = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+            if (p === 'Urgente') c = 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+            if (p === 'Alta') c = 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300';
+            if (p === 'Media') c = 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+            return `<span class="px-2.5 py-1 text-xs font-semibold rounded-full ${c}">${esc(p)}</span>`;
+        }
+
+        function statusBadge(s) {
+            let c = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300';
+            if (s === 'In carico') c = 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300';
+            if (s === 'Risolta') c = 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+            return `<span class="px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${c}">${esc(STATUS_LABEL[s] || s)}</span>`;
+        }
+
+        function statusAccent(s) {
+            if (s === 'In carico') return 'border-l-indigo-500';
+            if (s === 'Risolta') return 'border-l-green-500';
+            return 'border-l-yellow-400';
+        }
+
+        function renderTimeline(issue) {
+            const notes = [...(issue.notes || [])].sort((a, b) => (a.at || 0) - (b.at || 0));
+            if (!notes.length) return '<p class="text-xs text-gray-400 italic">Nessuna nota inserita.</p>';
+            return `<ol class="relative border-l border-gray-200 dark:border-gray-700 ml-2 space-y-3">` + notes.map(n => {
+                const isStatus = n.type === 'status';
+                return `
+                    <li class="ml-4">
+                        <span class="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${isStatus ? 'bg-gray-400' : 'bg-indigo-500'}"></span>
+                        <div class="text-xs text-gray-400">
+                            <span class="font-semibold ${isStatus ? 'text-gray-500 dark:text-gray-300' : 'text-indigo-600 dark:text-indigo-400'}">${esc(n.author)}</span> · ${esc(n.timestamp)}
+                        </div>
+                        ${n.text ? `<div class="text-sm mt-0.5 whitespace-pre-line ${isStatus ? 'italic text-gray-500 dark:text-gray-400' : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2'}">${esc(n.text)}</div>` : ''}
+                        ${renderAttachments(n)}
+                    </li>`;
+            }).join('') + `</ol>`;
+        }
+
+        function renderAttachments(note) {
+            const shots = (note.attachments || []).filter(a => typeof a.url === 'string' && a.url.startsWith('/api/screenshots/'));
+            if (!shots.length) return '';
+            return `<div class="flex flex-wrap gap-2 mt-2">` + shots.map(a => `
+                <button type="button" onclick="openShot('${esc(a.url)}')" title="${esc(a.name || 'Screenshot')}"
+                    class="block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:ring-2 hover:ring-indigo-400 transition">
+                    <img src="${esc(a.url)}" alt="${esc(a.name || 'Screenshot')}" loading="lazy" class="w-28 h-20 object-cover bg-gray-100 dark:bg-gray-900">
+                </button>`).join('') + `</div>`;
+        }
+
+        function shotCount(issue) {
+            return (issue.notes || []).reduce((sum, n) => sum + (n.attachments || []).length, 0);
+        }
+
+        function noteCount(issue) {
+            return (issue.notes || []).filter(n => n.type !== 'status').length;
+        }
+
+        function renderActions(issue) {
+            const id = issue.id;
+            const btn = 'px-3 py-1.5 text-xs font-medium rounded-lg transition';
+            const mine = issue.assignee && issue.assignee === currentUser;
+            return `
+                <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t dark:border-gray-700">
+                    <div class="flex flex-wrap gap-2">
+                        ${issue.status === 'Aperta' ? `<button onclick="updateStatus('${id}', 'In carico')" class="${btn} bg-indigo-600 text-white hover:bg-indigo-700">🛠 Prendi in carico</button>` : ''}
+                        ${issue.status === 'In carico' && !mine ? `<button onclick="updateStatus('${id}', 'In carico')" class="${btn} bg-indigo-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-300 hover:bg-indigo-100">Subentra</button>` : ''}
+                        ${issue.status === 'In carico' && mine ? `<button onclick="releaseIssue('${id}')" class="${btn} bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200">Rilascia</button>` : ''}
+                        ${issue.status !== 'Risolta' ? `<button onclick="updateStatus('${id}', 'Risolta')" class="${btn} bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-100">✓ Segna come risolta</button>` : ''}
+                        ${issue.status === 'Risolta' ? `<button onclick="updateStatus('${id}', 'Aperta')" class="${btn} bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 hover:bg-orange-100">↺ Riapri problema</button>` : ''}
+                    </div>
+                    <button onclick="deleteIssue('${id}')" class="text-xs text-red-500 hover:text-red-700 font-medium">🗑 Elimina</button>
+                </div>`;
+        }
+
+        // Scheda di dettaglio completa (descrizione, stato, note, azioni)
+        function renderDetail(issue, { withHeader = true } = {}) {
+            const id = issue.id;
+            const resolved = issue.status === 'Risolta';
+            return `
+                <div class="space-y-4">
+                    ${withHeader ? `
+                    <div class="flex flex-col sm:flex-row justify-between items-start gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${statusBadge(issue.status)} ${priorityBadge(issue.priority)}
+                            <span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">${esc(issue.category)}</span>
+                        </div>
+                        <span class="text-xs text-gray-400">Segnalato da <strong class="text-gray-600 dark:text-gray-300">${esc(issue.author)}</strong> · ${esc(issue.displayDate || 'Recente')}</span>
+                    </div>
+                    <h3 class="text-lg font-bold ${resolved ? 'line-through decoration-green-500/60 text-gray-500 dark:text-gray-400' : ''}">${esc(issue.title)}</h3>` : ''}
+
+                    <p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">${esc(issue.description)}</p>
+
+                    <dl class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div class="bg-gray-50 dark:bg-gray-900/40 rounded-lg px-3 py-2">
+                            <dt class="text-gray-400">In carico a</dt>
+                            <dd class="font-semibold mt-0.5">${issue.assignee ? '🛠 ' + esc(issue.assignee) : '<span class="text-gray-400 font-normal italic">Nessuno</span>'}</dd>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-900/40 rounded-lg px-3 py-2">
+                            <dt class="text-gray-400">Ultimo aggiornamento</dt>
+                            <dd class="font-semibold mt-0.5">${esc(issue.lastActivity || issue.displayDate || '—')}</dd>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-900/40 rounded-lg px-3 py-2">
+                            <dt class="text-gray-400">${resolved ? 'Risolta da' : 'Note di lavoro'}</dt>
+                            <dd class="font-semibold mt-0.5">${resolved ? `✅ ${esc(issue.resolvedBy || '—')} <span class="font-normal text-gray-400">${esc(issue.resolvedAt || '')}</span>` : noteCount(issue)}</dd>
+                        </div>
+                    </dl>
+
+                    ${resolved && issue.resolution ? `
+                    <div class="text-sm bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-lg px-3 py-2">
+                        <span class="font-semibold">Soluzione:</span> ${esc(issue.resolution)}
+                    </div>` : ''}
+
+                    <!-- Note e cronologia -->
+                    <div class="border-t dark:border-gray-700 pt-3">
+                        <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Note e cronologia attività</p>
+                        ${renderTimeline(issue)}
+                        <div class="mt-4 rounded-lg" ondragover="event.preventDefault(); this.classList.add('ring-2', 'ring-indigo-400')"
+                            ondragleave="this.classList.remove('ring-2', 'ring-indigo-400')" ondrop="noteDrop(event, '${id}')">
+                            <textarea id="note-${id}" rows="2" oninput="drafts['${id}'] = this.value" onkeydown="noteKeydown(event, '${id}')" onpaste="notePaste(event, '${id}')"
+                                placeholder="${resolved ? 'Aggiungi un commento...' : 'Aggiorna il team: cosa hai fatto, a che punto sei, cosa manca... (puoi incollare uno screenshot)'}"
+                                class="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary focus:outline-none">${esc(drafts[id] || '')}</textarea>
+                            <div id="shots-${id}">${shotTrayHtml(id)}</div>
+                            <div class="flex flex-wrap justify-between items-center gap-2 mt-2">
+                                <span class="text-xs text-gray-400">Ctrl/⌘ + Invio per salvare · incolla o trascina le immagini</span>
+                                <div class="flex gap-2">
+                                    <label class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer">
+                                        📎 Allega screenshot
+                                        <input type="file" accept="image/*" multiple class="hidden" onchange="addShots('${id}', this.files); this.value = ''">
+                                    </label>
+                                    <button onclick="addNote('${id}')" ${uploading.has(id) ? 'disabled' : ''} class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-wait">${uploading.has(id) ? '⏳ Invio in corso...' : '💬 Aggiungi nota'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${renderActions(issue)}
+                </div>`;
+        }
+
+        function renderCard(issue) {
+            return `
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 ${statusAccent(issue.status)}">
+                    ${renderDetail(issue)}
+                </div>`;
+        }
+
+        // Vista "Tutti": elenco compatto, espandibile riga per riga
+        function renderAllView(list) {
+            return `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <div class="hidden sm:grid grid-cols-12 gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gray-400 bg-gray-50 dark:bg-gray-900/40 border-b dark:border-gray-700">
+                        <div class="col-span-2">Stato</div>
+                        <div class="col-span-5">Problematica</div>
+                        <div class="col-span-2">Priorità</div>
+                        <div class="col-span-2">In carico a</div>
+                        <div class="col-span-1 text-right">Note</div>
+                    </div>
+                    ${list.map(issue => {
+                        const open = expanded.has(issue.id);
+                        return `
+                        <div class="border-b last:border-b-0 dark:border-gray-700 border-l-4 ${statusAccent(issue.status)}">
+                            <button onclick="toggleRow('${issue.id}')" class="w-full text-left grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
+                                <div class="col-span-4 sm:col-span-2">${statusBadge(issue.status)}</div>
+                                <div class="col-span-8 sm:col-span-5 min-w-0">
+                                    <p class="font-semibold truncate ${issue.status === 'Risolta' ? 'text-gray-500 dark:text-gray-400' : ''}">${esc(issue.title)}</p>
+                                    <p class="text-xs text-gray-400 truncate">${esc(issue.category)} · ${esc(issue.author)} · ${esc(issue.displayDate || '')}</p>
+                                </div>
+                                <div class="hidden sm:block col-span-2">${priorityBadge(issue.priority)}</div>
+                                <div class="hidden sm:block col-span-2 text-sm truncate">${issue.assignee ? esc(issue.assignee) : '<span class="text-gray-400">—</span>'}</div>
+                                <div class="hidden sm:flex col-span-1 justify-end items-center gap-1 text-sm text-gray-400">💬 ${noteCount(issue)}${shotCount(issue) ? ` · 📷 ${shotCount(issue)}` : ''} <span class="ml-1 transition ${open ? 'rotate-180' : ''}">▾</span></div>
+                            </button>
+                            ${open ? `<div class="px-4 pb-4 pt-1 bg-gray-50/50 dark:bg-gray-900/20">${renderDetail(issue, { withHeader: false })}</div>` : ''}
+                        </div>`;
+                    }).join('')}
+                </div>`;
+        }
+
+        // Vista "Aperti / In corso": bacheca a due colonne ordinata per priorità
+        function renderActiveView(list) {
+            const byPriority = (a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+            const columns = [
+                { title: '🟡 Da prendere in carico', items: list.filter(i => i.status === 'Aperta').sort(byPriority), empty: 'Nessuna segnalazione in attesa.' },
+                { title: '🔵 In lavorazione', items: list.filter(i => i.status === 'In carico').sort(byPriority), empty: 'Nessuno ci sta lavorando al momento.' }
+            ];
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    ${columns.map(col => `
+                        <div class="bg-gray-100/70 dark:bg-gray-800/50 rounded-xl p-3 space-y-3">
+                            <div class="flex items-center justify-between px-1">
+                                <h3 class="font-semibold">${col.title}</h3>
+                                <span class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-0.5 rounded-full">${col.items.length}</span>
+                            </div>
+                            ${col.items.length ? col.items.map(renderCard).join('') : `<p class="text-sm text-gray-400 text-center py-8">${col.empty}</p>`}
+                        </div>`).join('')}
+                </div>`;
+        }
+
+        // Vista "Risolti": archivio delle soluzioni
+        function renderResolvedView(list) {
+            return `<div class="space-y-4">${list.map(renderCard).join('')}</div>`;
+        }
+
+        function renderHeaderAndTabs(counts) {
+            const tabs = [
+                { key: 'all', label: 'Tutti', count: counts.total },
+                { key: 'active', label: 'Aperti / In corso', count: counts.open + counts.progress },
+                { key: 'resolved', label: 'Risolti', count: counts.resolved }
+            ];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`filter-${t.key}`);
+                const active = t.key === currentFilter;
+                btn.className = `flex-1 md:flex-none px-4 py-2 text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 ${active ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`;
+                btn.innerHTML = `${t.label} <span class="text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/30 dark:text-indigo-200' : 'bg-gray-300/60 dark:bg-gray-700'}">${t.count}</span>`;
+            });
+
+            const headers = {
+                all: ['Panoramica completa', 'Tutte le segnalazioni in ordine cronologico. Clicca su una riga per vedere dettagli e note.'],
+                active: ['Lavori in corso', 'Problematiche ancora da risolvere, divise tra quelle in attesa e quelle già prese in carico, ordinate per priorità.'],
+                resolved: ['Archivio risolti', 'Storico delle problematiche chiuse, con chi le ha risolte e come.']
+            };
+            const [title, sub] = headers[currentFilter];
+            document.getElementById('view-header').innerHTML = `
+                <h2 class="text-lg font-semibold">${title}</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">${sub}</p>`;
         }
 
         function renderIssues() {
             const container = document.getElementById('issues-container');
             const search = (document.getElementById('search-input').value || '').toLowerCase();
+            const priority = document.getElementById('priority-filter').value;
+
+            const counts = {
+                total: issuesCache.length,
+                open: issuesCache.filter(i => i.status === 'Aperta').length,
+                progress: issuesCache.filter(i => i.status === 'In carico').length,
+                resolved: issuesCache.filter(i => i.status === 'Risolta').length
+            };
+            document.getElementById('stat-total').innerText = counts.total;
+            document.getElementById('stat-open').innerText = counts.open;
+            document.getElementById('stat-progress').innerText = counts.progress;
+            document.getElementById('stat-resolved').innerText = counts.resolved;
+            renderHeaderAndTabs(counts);
+
+            if (!loaded) return;
 
             const filtered = issuesCache.filter(issue => {
-                const matchesSearch = (issue.title || '').toLowerCase().includes(search) || 
-                                      (issue.description || '').toLowerCase().includes(search) || 
-                                      (issue.category || '').toLowerCase().includes(search);
-                if (!matchesSearch) return false;
+                const haystack = [issue.title, issue.description, issue.category, issue.author, issue.assignee]
+                    .concat((issue.notes || []).map(n => n.text)).join(' ').toLowerCase();
+                if (search && !haystack.includes(search)) return false;
+                if (priority && issue.priority !== priority) return false;
                 if (currentFilter === 'active') return issue.status !== 'Risolta';
                 if (currentFilter === 'resolved') return issue.status === 'Risolta';
                 return true;
             });
 
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-gray-500 bg-gray-800 border border-gray-700 rounded-2xl">Nessuna problematica trovata.</div>`;
+            // Conserva il focus su una nota in scrittura durante gli aggiornamenti in tempo reale
+            const focused = document.activeElement;
+            const focusedId = focused && focused.id && focused.id.startsWith('note-') ? focused.id : null;
+            const caret = focusedId ? focused.selectionStart : 0;
+
+            if (filtered.length === 0 && currentFilter !== 'active') {
+                container.innerHTML = `<div class="text-center py-12 text-gray-400 bg-white dark:bg-gray-800 rounded-xl shadow-sm">Nessuna problematica trovata.</div>`;
                 return;
             }
 
-            container.innerHTML = filtered.map(issue => {
-                let badgeColor = 'bg-gray-700 text-gray-300';
-                if (issue.priority === 'Urgente') badgeColor = 'bg-red-500/20 text-red-400 border border-red-500/30';
-                if (issue.priority === 'Alta') badgeColor = 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
-                if (issue.priority === 'Media') badgeColor = 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+            if (currentFilter === 'all') container.innerHTML = renderAllView(filtered);
+            else if (currentFilter === 'active') container.innerHTML = renderActiveView(filtered);
+            else container.innerHTML = renderResolvedView(filtered);
 
-                let statusBadge = 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
-                if (issue.status === 'In carico') statusBadge = 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30';
-                if (issue.status === 'Risolta') statusBadge = 'bg-green-500/20 text-green-400 border border-green-500/30';
-
-                const notesHtml = (issue.notes || []).map(n => `
-                    <div class="text-xs bg-gray-900/60 p-3 rounded-xl border border-gray-700 space-y-2 mt-2">
-                        <div class="flex justify-between text-gray-400">
-                            <span class="font-bold text-indigo-400">${n.author}</span>
-                            <span>${n.timestamp}</span>
-                        </div>
-                        <p class="text-gray-300">${n.text}</p>
-                        ${n.image ? `<a href="${n.image}" target="_blank"><img src="${n.image}" class="mt-2 rounded-lg max-h-40 object-cover border border-gray-700 hover:opacity-90 transition cursor-pointer" title="Clicca per ingrandire lo screenshot"></a>` : ''}
-                    </div>
-                `).join('');
-
-                return `
-                    <div class="bg-gray-800 border border-gray-700 p-5 rounded-2xl shadow-lg space-y-4">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <span class="px-3 py-1 text-xs font-bold rounded-lg ${statusBadge}">${issue.status}</span>
-                                <span class="px-3 py-1 text-xs font-bold rounded-lg ${badgeColor}">Priorità: ${issue.priority}</span>
-                                <span class="px-3 py-1 text-xs font-semibold rounded-lg bg-gray-700 text-gray-300 border border-gray-600">${issue.category}</span>
-                            </div>
-                            <span class="text-xs text-gray-400">Inserito da <strong class="text-gray-200">${issue.author}</strong> (${issue.displayDate || 'Recente'})</span>
-                        </div>
-
-                        <div>
-                            <h3 class="text-lg font-bold text-white tracking-wide">${issue.title}</h3>
-                            <p class="text-sm text-gray-300 mt-1 leading-relaxed">${issue.description}</p>
-                        </div>
-
-                        ${issue.assignee ? `<p class="text-xs text-indigo-400 font-medium">🛠 In carico a: <strong class="text-white">${issue.assignee}</strong></p>` : ''}
-
-                        <!-- Sezione Note & Screenshot -->
-                        <div class="border-t border-gray-700 pt-3">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Note e Screenshot Tecnici</span>
-                                <button onclick="addNoteWithImage('${issue.id}')" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">+ Aggiungi Nota / Screenshot</button>
-                            </div>
-                            <div class="space-y-2">${notesHtml || '<p class="text-xs text-gray-500 italic">Nessuna nota o allegato presente.</p>'}</div>
-                        </div>
-
-                        <!-- Bottoni di controllo workflow -->
-                        <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-gray-700">
-                            <div class="flex gap-2 flex-wrap">
-                                ${issue.status === 'Aperta' ? `<button onclick="updateStatus('${issue.id}', 'In carico')" class="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/50">Prendi in carico</button>` : ''}
-                                ${issue.status !== 'Risolta' ? `<button onclick="updateStatus('${issue.id}', 'Risolta')" class="px-3.5 py-1.5 text-xs font-semibold bg-green-600/30 text-green-300 border border-green-500/30 rounded-xl hover:bg-green-600/50">Segna come Risolta</button>` : ''}
-                                ${issue.status === 'Risolta' ? `<button onclick="updateStatus('${issue.id}', 'Aperta')" class="px-3.5 py-1.5 text-xs font-semibold bg-orange-600/30 text-orange-300 border border-orange-500/30 rounded-xl hover:bg-orange-600/50">Riapri problema</button>` : ''}
-                            </div>
-                            <button onclick="deleteIssue('${issue.id}')" class="text-xs text-red-400 hover:text-red-300 font-medium">🗑 Elimina task</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            if (focusedId) {
+                const el = document.getElementById(focusedId);
+                if (el) { el.focus(); el.setSelectionRange(caret, caret); }
+            }
         }
 
         window.onload = () => {
             checkUser();
+            renderIssues();
         };
     </script>
+
+    <!-- Visualizzatore screenshot -->
+    <div id="lightbox" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onclick="if (event.target === this) closeShot()">
+        <div class="relative max-w-6xl w-full flex flex-col items-center gap-3">
+            <img id="lightbox-img" alt="Screenshot" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl">
+            <div class="flex gap-3">
+                <a id="lightbox-open" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 text-white hover:bg-white/20">↗ Apri originale</a>
+                <button onclick="closeShot()" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 text-white hover:bg-white/20">✕ Chiudi</button>
+            </div>
+        </div>
+    </div>
+    <script>document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShot(); });</script>
 </body>
 </html>
+<script async src="/.netlify/scripts/ar" data-netlify-deploy-id="6ae7bd99fbc66128971e44db" data-netlify-site-id="8d23f308-542c-45e8-b1de-6c9b76d87362" data-agent-runner-id="6ae7bc887994534cc097510b"></script>
+<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="8d23f308-542c-45e8-b1de-6c9b76d87362" data-app-host="app.netlify.com" data-account-tier="free"></script>
