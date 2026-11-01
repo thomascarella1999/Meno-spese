@@ -1,1 +1,2 @@
-TEST
+MODIFICHE DA FARE:
+Nella configurazione iniziale bisogna dare più libertà all'utente. L'utente deve poter essere libero di inserire più tipologie di spese ricorrenti, con quale frequenza, senza essere vincolato necessariamente alle sole singole categorie "internet", "auto" ecc... Magari creare un bottone "aggiungi spese fisse" e nel bottone si apre una schermata fluttuante che ti fa creare in maniera guidata la tipologia di spesa fissa che hai.
